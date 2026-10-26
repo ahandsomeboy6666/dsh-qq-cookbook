@@ -10,13 +10,15 @@
   },
   "scripts": {
     "check:assets": "node checks/check-assets.mjs",
+    "check:consistency": "node checks/check-consistency.mjs",
+    "check:all": "node checks/check-assets.mjs && node checks/check-consistency.mjs",
     "probe:dsh": "node checks/probe-dsh.mjs",
     "probe:onebot": "node checks/probe-onebot.mjs",
     "check:install": "node checks/check-install.mjs",
     "check:persona": "node checks/check-persona.mjs",
     "check:budget": "node checks/check-budget.mjs",
     "check:browser": "node checks/check-browser.mjs",
-    "check": "node checks/check-assets.mjs && node checks/probe-dsh.mjs && node checks/probe-onebot.mjs",
+    "check": "node checks/check-assets.mjs && node checks/check-consistency.mjs && node checks/probe-dsh.mjs && node checks/probe-onebot.mjs",
     "test": "node --test tests/"
   }
 }

@@ -94,6 +94,7 @@ const REQUIRED = [
   'tasks/12-persona.md',
   'tasks/13-allowance-browser.md',
   'checks/check-assets.mjs',
+  'checks/check-consistency.mjs',
   'checks/probe-dsh.mjs',
   'checks/probe-onebot.mjs',
   'checks/check-install.mjs',
