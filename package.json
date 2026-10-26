@@ -22,6 +22,6 @@
     "check:persona": "node checks/check-persona.mjs",
     "check:budget": "node checks/check-budget.mjs",
     "check:browser": "node checks/check-browser.mjs",
-    "test": "node --test tests/"
+    "test": "node cli.mjs check"
   }
 }

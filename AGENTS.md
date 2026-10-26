@@ -76,7 +76,12 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
    ```
 
    `check` 必须全绿才允许汇报；`doctor`/`status` 的 FAIL 表示“未就绪”，照实写。
-4. **commit 用模板**：首次克隆执行 `git config commit.template .gitmessage`。
+4. **启用 hooks**：首次克隆执行
+   ```powershell
+   git config core.hooksPath .githooks
+   git config commit.template .gitmessage
+   ```
+   `pre-commit` 会跑 `cli.mjs check`；`commit-msg` 会要求「事实变更：」栏（临时跳过：`SKIP_COMMIT_MSG=1 git commit ...`）。
 5. **commit message 必须写事实变更**：`事实变更：F1 cheems → 官方 Bot`；没有变更写「无」。
 
 违反任一条 = 没做完，不许用「应该没问题」代替。

@@ -1,0 +1,12 @@
+#!/bin/sh
+# 提交信息门禁：必须写「事实变更：」一栏。
+# 跳过：SKIP_COMMIT_MSG=1 git commit ...
+[ "$SKIP_COMMIT_MSG" = "1" ] && exit 0
+if ! grep -q '事实变更' "$1"; then
+  echo ""
+  echo "  commit message 缺少「事实变更：」一栏。"
+  echo "  补一栏：事实变更：无"
+  echo "  或临时跳过：SKIP_COMMIT_MSG=1 git commit ..."
+  echo ""
+  exit 1
+fi

@@ -1,0 +1,4 @@
+#!/bin/sh
+# 提交前门禁：静态检查不过，不允许提交。
+# 启用：git config core.hooksPath .githooks
+node cli.mjs check

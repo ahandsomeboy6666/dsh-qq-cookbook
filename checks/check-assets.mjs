@@ -52,6 +52,8 @@ const REQUIRED = [
   '.gitmessage',
   'cli.mjs',
   'docs/templates/ci-check.yml',
+  '.githooks/pre-commit',
+  '.githooks/commit-msg',
   'docs/README.md',
   'docs/FACTS.md',
   'docs/00-proposal.md',
@@ -278,6 +280,76 @@ try {
   check('FACTS.md 覆盖 F1–F6', missing.length === 0, missing.length ? `缺：${missing.join('、')}` : '')
 } catch (err) {
   check('FACTS.md 覆盖 F1–F6', false, String(err.message))
+}
+
+// ---------------------------------------------------------------- 11. ADR ↔ 台账
+try {
+  const ledger = await read('docs/decisions/README.md')
+  const rows = ledger.split('\n').filter(l => /^\|\s*\[ADR-\d{3}-[^\]]+\]\([^)]+\)/.test(l))
+  const mismatches = []
+  for (const row of rows) {
+    const cells = row.split('|').map(s => s.trim())
+    const file = (cells[1] ?? '').match(/\(([^)]+)\)/)?.[1]
+    const ledgerState = cells[cells.length - 2] ?? ''
+    if (!file?.endsWith('.md')) continue
+    const md = await read(`docs/decisions/${file}`).catch(() => '')
+    const state = md.match(/^##\s+状态\s*\n+([^\n]+)/m)?.[1]?.trim() ?? ''
+    const first = state.match(/^(待确认|已接受|已验证|已否决|已取代)/)?.[1]
+    if (!first || !ledgerState.includes(first)) {
+      mismatches.push(`${file}: 台账「${ledgerState}」vs ADR「${first ?? '无'}」`)
+    }
+  }
+  check('ADR 状态与台账一致', mismatches.length === 0, mismatches.join('；'))
+} catch (err) {
+  check('ADR 状态与台账一致', false, String(err.message))
+}
+
+// ---------------------------------------------------------------- 12. 任务卡脚本存在
+try {
+  const pkg = JSON.parse(await read('package.json'))
+  const scripts = new Set(Object.keys(pkg.scripts ?? {}))
+  const missing = []
+  const activeTasks = taskFiles.filter(f => Number.parseInt(f.slice(0, 2), 10) >= 10)
+  for (const file of activeTasks) {
+    const md = await read(`tasks/${file}`)
+    const accept = md.split(/^##\s+验收\s*$/m)[1]?.split(/^##\s+/m)[0] ?? ''
+    for (const m of accept.matchAll(/`([^`]+)`/g)) {
+      const cmd = m[1].trim()
+      const nodeHit = cmd.match(/^node\s+([^\s]+)/)
+      if (nodeHit && !nodeHit[1].startsWith('-')) {
+        const p = nodeHit[1].replace(/^\.\//, '')
+        if (!(await exists(p))) missing.push(`${file}: ${p}`)
+      }
+      const npmHit = cmd.match(/^npm run\s+([^\s]+)/)
+      if (npmHit && !scripts.has(npmHit[1])) missing.push(`${file}: npm run ${npmHit[1]}`)
+    }
+  }
+  check('任务卡引用的脚本存在', missing.length === 0, missing.join('；'))
+} catch (err) {
+  check('任务卡引用的脚本存在', false, String(err.message))
+}
+
+// ---------------------------------------------------------------- 13. FACTS 真源存在
+try {
+  const facts = await read('docs/FACTS.md')
+  const rows = facts.split('\n').filter(l => /^\|\s*F\d+\s*\|/.test(l))
+  const missing = []
+  for (const row of rows) {
+    const cells = row.split('|').map(s => s.trim())
+    const sourceCell = cells[4] ?? ''
+    const paths = [
+      ...[...sourceCell.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]),
+      ...[...sourceCell.matchAll(/`([^`]+)`/g)].map(m => m[1])
+    ]
+    for (const p of paths) {
+      if (/^https?:/.test(p)) continue
+      const ok = (await exists(p)) || (await exists(join('docs', p)))
+      if (!ok) missing.push(p)
+    }
+  }
+  check('FACTS 真源存在', missing.length === 0, [...new Set(missing)].join('、'))
+} catch (err) {
+  check('FACTS 真源存在', false, String(err.message))
 }
 
 // ---------------------------------------------------------------- 输出
