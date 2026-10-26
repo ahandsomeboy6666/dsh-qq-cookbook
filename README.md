@@ -12,11 +12,12 @@
 
 | 你的目标 | 选这条路 | 一句话理由 |
 |---|---|---|
-| 个人自用、多模态、群友玩法 | **NapCat + 插件适配层**（推荐默认） | 无审核门槛，能拿全量事件；本机已在跑 |
-| 对外服务、要按钮审批 | **QQ 官方 Bot + 插件适配层** | 合规稳定，审批是内联按钮（✅⭐❌） |
-| 脚本/外部程序驱动 | **ACP / SDK / Web `/api`** | 官方自动化面，但审批能力受限 |
+| 手机远程用电脑上的 agent（推荐默认） | **QQ 官方 Bot + 插件**（xcisxc29 / 腾讯官方） | 扫码零配置、按钮审批、无封号 |
+| 群友/群管玩法（表情包、主动开口、审批放行） | **NapCat + 插件**（cheems / zaofan） | 自定义唤醒、多模态、无主动消息配额 |
+| 已有 qq-bridge、想换 NapCat | **qq-bridge + NapCat 魔改** | 保留全部功能，代价 6–9 人日 |
+| 要自己掌控代码、可验收、可改 | **按 cookbook 新写** | 体验可控，代价 20–30 人日 |
 
-详细对比与证据见 [docs/01-tech-selection.md](docs/01-tech-selection.md)，生态调研见 [prior art](docs/references/prior-art.md)。
+体验评分与依据见 [评分卡](docs/references/experience-scorecard.md)，生态调研见 [prior art](docs/references/prior-art.md)。
 
 ## 30 分钟最小回环（M0）
 

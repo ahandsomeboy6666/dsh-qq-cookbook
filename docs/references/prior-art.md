@@ -17,6 +17,21 @@
 
 另有 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 收录 `dsh-im-qq`，以及 npm 包 `@yachangchang/dsh-qq-bridge`。
 
+### 星数与适配（2026-10-17 快照，来源 `awesome-dsh-plugins` Channels 表）
+
+| 项目 | ★ | 路线 | 适配版本 |
+|---|---|---|---|
+| **qq-bridge**（Derpyu520） | **2453** | SnowLuma | 0.1.1-rc.2（README 称 0.2.1） |
+| **dsh-qqbot**（腾讯官方 tencent-connect） | **252** | 官方 Bot | 0.1.0-rc.8 |
+| dsh-qqbot-gcry1306（zaofan 增强 fork） | 115 | 官方 Bot | 0.1.7-rc.2 |
+| dsh-qq-plugin（xcisxc29） | 38 | 官方 Bot | **0.2.0-rc.2** |
+| qq-bridge-plus（preset bundle） | 26 | — | 0.2.0-rc.2 |
+| dsh-qq-bridge-tomoyona | 19 | NapCat | 0.1.1-rc.2 |
+
+**读法**：星数只说明「有人用」，不说明「体验好」。qq-bridge 星数断层第一，但体验评分排第 6（见下）。腾讯官方入场（252★）说明官方 Bot 是官方支持的路线。
+
+综合评分见 [体验评分卡](experience-scorecard.md)。
+
 ## 二、两条路线的真实差别
 
 | 维度 | NapCat / OneBot 11 | QQ 官方 Bot |

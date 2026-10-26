@@ -72,6 +72,7 @@ const REQUIRED = [
   'docs/decisions/ADR-011-onboarding.md',
   'docs/references/dsh-capability-matrix.md',
   'docs/references/prior-art.md',
+  'docs/references/experience-scorecard.md',
   'docs/references/qq-bridge-baseline.md',
   'docs/templates/task-card.md',
   'docs/templates/proposal.md',

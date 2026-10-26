@@ -32,7 +32,7 @@
 | 文件 | 一句话 | 状态 |
 |---|---|---|
 | [docs/decisions/README.md](decisions/README.md) | 决策台账：每条推荐值、备选、影响、状态 | 草案 |
-| [docs/decisions/ADR-001-qq-endpoint.md](decisions/ADR-001-qq-endpoint.md) | QQ 协议端选 OneBot v11（NapCat 默认 / SnowLuma 备选） | 待确认 |
+| [docs/decisions/ADR-001-qq-endpoint.md](decisions/ADR-001-qq-endpoint.md) | QQ 协议端：官方 Bot 默认 + NapCat 群友路线 | 待确认 |
 | [docs/decisions/ADR-002-dsh-access.md](decisions/ADR-002-dsh-access.md) | DSH 接入默认 Web `/api`，ACP/SDK 作为可选自动化通道 | 待确认 |
 | [docs/decisions/ADR-003-process-shape.md](decisions/ADR-003-process-shape.md) | 独立桥接进程，不做进程内插件 | 待确认 |
 | [docs/decisions/ADR-004-session-mapping.md](decisions/ADR-004-session-mapping.md) | 1 个 QQ 会话 = 1 个 DSH 会话，映射持久化 | 待确认 |
@@ -50,6 +50,7 @@
 |---|---|---|
 | [docs/references/dsh-capability-matrix.md](references/dsh-capability-matrix.md) | DSH 五条接入面的能力对照，每条标版本与出处 | 参考 |
 | [docs/references/prior-art.md](references/prior-art.md) | 6 个已有实现、两条路线、可吸收设计与选型修正 | 参考 |
+| [docs/references/experience-scorecard.md](references/experience-scorecard.md) | 7 个方案的 6 维体验评分与分场景推荐 | 参考 |
 | [docs/references/qq-bridge-baseline.md](references/qq-bridge-baseline.md) | qq-bridge 的实测结论：哪些可复用、哪些需复核 | 参考 |
 
 ## 可复制模板
