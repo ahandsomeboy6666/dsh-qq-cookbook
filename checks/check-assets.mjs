@@ -373,8 +373,7 @@ try {
         continue
       }
       if (keyword && text.includes(keyword)) continue
-      if (sourceNeedle && text.includes(sourceNeedle)) continue
-      problems.push(`${id}: ${ref} 既没有「${keyword}」也没有真源「${sourceNeedle}」`)
+      problems.push(`${id}: ${ref} 缺少关键词「${keyword}」`)
     }
   }
   check('FACTS 引用点真实引用', problems.length === 0, problems.join('；'))
