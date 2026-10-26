@@ -1,6 +1,6 @@
 # 提案：DSH 接入 QQ
 
-> 状态：**草案**，待用户确认。确认后本文件的「待确认决策」清单转为对应 ADR 的状态。
+> 状态：**已接受**（2026-10-27）。方案定稿：cheems 插件 + NapCat，见 [当前方案](10-current-plan.md)。
 >
 > 相关：[技术选型](01-tech-selection.md) · [架构](02-architecture.md) · [威胁模型](03-threat-model.md) · [验收](04-acceptance.md)
 

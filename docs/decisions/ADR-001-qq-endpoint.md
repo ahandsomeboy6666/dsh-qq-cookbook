@@ -2,7 +2,7 @@
 
 ## 状态
 
-待确认。推荐值：**NapCat（OneBot 11）默认，QQ 官方 Bot 作为第二路线；两者共享上层，只换 transport**。
+已接受（2026-10-27）。最终：**cheems135/dsh-qq-bridge（NapCat）为默认，QQ 官方 Bot 为备选**。见 [当前方案](../10-current-plan.md)。
 
 ## 背景
 

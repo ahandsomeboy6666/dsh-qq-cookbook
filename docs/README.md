@@ -1,38 +1,38 @@
 # 文档索引
 
-每篇一句话说明 + 状态。状态含义：**现行**（当前有效）、**草案**（待用户确认）、**参考**（外部事实基线）。
+每篇一句话说明 + 状态。状态含义：**已定**（已拍板）、**参考**（外部事实基线）、**草案**（待确认）。
 
 ## 入口
 
 | 文件 | 一句话 | 状态 |
 |---|---|---|
-| [README.md](../README.md) | 全貌、一分钟选型、最小回环 | 草案 |
-| [AGENTS.md](../AGENTS.md) | AI 执行者规范：事实纪律、红绿流程、任务卡 | 草案 |
+| [README.md](../README.md) | 全貌、一分钟选型、最小回环 | 已定 |
+| [AGENTS.md](../AGENTS.md) | AI 执行者规范：事实纪律、红绿流程、任务卡 | 已定 |
 
 ## 提案与选型
 
 | 文件 | 一句话 | 状态 |
 |---|---|---|
-| [docs/00-proposal.md](00-proposal.md) | 为什么做、做到什么程度、不做什么、成功标准 | 草案 |
-| [docs/01-tech-selection.md](01-tech-selection.md) | 五条 DSH 接入通道、四类 QQ 协议端、推荐堆栈 | 草案 |
-| [docs/02-architecture.md](02-architecture.md) | 组件、入站/出站数据流、会话映射、失败模式 | 草案 |
-| [docs/03-threat-model.md](03-threat-model.md) | 信任边界、攻击面、六条红线与对策 | 草案 |
-| [docs/07-ux-spec.md](07-ux-spec.md) | 体验目标、11 个场景、U1–U10 指标、文案与群聊礼仪 | 草案 |
+| [docs/00-proposal.md](00-proposal.md) | 为什么做、做到什么程度、不做什么、成功标准 | 已定 |
+| [docs/01-tech-selection.md](01-tech-selection.md) | 五条 DSH 接入通道、四类 QQ 协议端、推荐堆栈 | 已定 |
+| [docs/02-architecture.md](02-architecture.md) | 组件、入站/出站数据流、会话映射、失败模式 | 已定 |
+| [docs/03-threat-model.md](03-threat-model.md) | 信任边界、攻击面、六条红线与对策 | 已定 |
+| [docs/07-ux-spec.md](07-ux-spec.md) | 体验目标、11 个场景、U1–U10 指标、文案与群聊礼仪 | 已定 |
 | [docs/10-current-plan.md](10-current-plan.md) | **当前方案一页纸**：cheems + NapCat + 30 元授权 + 两套人设 | 已拍板 |
 
 ## 执行
 
 | 文件 | 一句话 | 状态 |
 |---|---|---|
-| [docs/04-acceptance.md](04-acceptance.md) | 每个里程碑的验收命令、期望输出、红灯示例 | 草案 |
-| [docs/05-roadmap.md](05-roadmap.md) | M0–M4 里程碑、依赖图、任务卡索引 | 草案 |
-| [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 草案 |
+| [docs/04-acceptance.md](04-acceptance.md) | 每个里程碑的验收命令、期望输出、红灯示例 | 已定 |
+| [docs/05-roadmap.md](05-roadmap.md) | M0–M4 里程碑、依赖图、任务卡索引 | 已定 |
+| [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 已定 |
 
 ## 决策记录（ADR）
 
 | 文件 | 一句话 | 状态 |
 |---|---|---|
-| [docs/decisions/README.md](decisions/README.md) | 决策台账：每条推荐值、备选、影响、状态 | 草案 |
+| [docs/decisions/README.md](decisions/README.md) | 决策台账：每条推荐值、备选、影响、状态 | 已定 |
 | [docs/decisions/ADR-001-qq-endpoint.md](decisions/ADR-001-qq-endpoint.md) | QQ 协议端：官方 Bot 默认 + NapCat 群友路线 | 待确认 |
 | [docs/decisions/ADR-002-dsh-access.md](decisions/ADR-002-dsh-access.md) | DSH 接入默认 Web `/api`，ACP/SDK 作为可选自动化通道 | 待确认 |
 | [docs/decisions/ADR-003-process-shape.md](decisions/ADR-003-process-shape.md) | 独立桥接进程，不做进程内插件 | 待确认 |
