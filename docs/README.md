@@ -68,4 +68,4 @@
 | [docs/templates/proposal.md](templates/proposal.md) | 提案模板（目标/非目标/成功标准/假设/风险） | 参考 |
 | [docs/templates/adr.md](templates/adr.md) | ADR 模板（六段 + 状态机） | 参考 |
 | [docs/templates/AGENTS.skeleton.md](templates/AGENTS.skeleton.md) | 新项目 AGENTS.md 骨架（30 分钟初始化） | 参考 |
-| [docs/templates/ci-check.yml](templates/ci-check.yml) | GitHub Actions 门禁模板（复制到 `.github/workflows/`） | 参考 |
+| [docs/templates/ci-check.yml](templates/ci-check.yml) | GitHub Actions 门禁模板（**已启用**：`.github/workflows/check.yml`） | 参考 |

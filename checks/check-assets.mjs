@@ -52,6 +52,7 @@ const REQUIRED = [
   '.gitmessage',
   'cli.mjs',
   'docs/templates/ci-check.yml',
+  '.github/workflows/check.yml',
   '.githooks/pre-commit',
   '.githooks/commit-msg',
   'docs/README.md',
