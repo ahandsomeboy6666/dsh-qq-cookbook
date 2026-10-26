@@ -49,6 +49,7 @@
 | 文件 | 一句话 | 状态 |
 |---|---|---|
 | [docs/references/dsh-capability-matrix.md](references/dsh-capability-matrix.md) | DSH 五条接入面的能力对照，每条标版本与出处 | 参考 |
+| [docs/references/prior-art.md](references/prior-art.md) | 6 个已有实现、两条路线、可吸收设计与选型修正 | 参考 |
 | [docs/references/qq-bridge-baseline.md](references/qq-bridge-baseline.md) | qq-bridge 的实测结论：哪些可复用、哪些需复核 | 参考 |
 
 ## 可复制模板

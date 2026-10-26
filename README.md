@@ -12,13 +12,11 @@
 
 | 你的目标 | 选这条路 | 一句话理由 |
 |---|---|---|
-| 日常聊天、要转发提问/审批 | **Web profile + `/api` RPC**（推荐默认） | 唯一能同时拿到「投消息 + assistant 事件 + 交互事件」的通道 |
-| 无人值守自动化、脚本驱动 | **ACP profile**（JSON-RPC stdio） | 官方自动化面，有 `session/resume` 与权限应答，但**没有**提问转发 |
-| 嵌入自己的 TS/Python 程序 | **SDK profile**（`@deepseek-ai/dsh-sdk`） | 能用 `session(id)` 打开已有会话、收通知，但**没有**审批请求通道 |
-| 外部事件触发一次性任务 | **webhook** | 只创建新会话、fire-and-forget，不适合双向聊天 |
-| 想少一个进程 | **进程内插件** | 与 DSH 同生共死，QQ 崩了会拖垮 host，不推荐 MVP |
+| 个人自用、多模态、群友玩法 | **NapCat + 插件适配层**（推荐默认） | 无审核门槛，能拿全量事件；本机已在跑 |
+| 对外服务、要按钮审批 | **QQ 官方 Bot + 插件适配层** | 合规稳定，审批是内联按钮（✅⭐❌） |
+| 脚本/外部程序驱动 | **ACP / SDK / Web `/api`** | 官方自动化面，但审批能力受限 |
 
-详细对比与证据见 [docs/01-tech-selection.md](docs/01-tech-selection.md)。
+详细对比与证据见 [docs/01-tech-selection.md](docs/01-tech-selection.md)，生态调研见 [prior art](docs/references/prior-art.md)。
 
 ## 30 分钟最小回环（M0）
 

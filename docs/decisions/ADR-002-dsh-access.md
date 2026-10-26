@@ -1,39 +1,47 @@
-# ADR-002：DSH 接入默认走 Web `/api`
+# ADR-002：DSH 接入走进程内插件适配层
 
 ## 状态
 
-待确认。推荐值：**Web `/api` 为默认通道；ACP、SDK 作为 `DshAdapter` 的第二实现，M2 之后按场景启用**。
+待确认。推荐值：**DSH 插件适配层为主；Web `/api` 只用于旧版或外部脚本**。
 
 ## 背景
 
-DSH `0.2.0-rc.2`（本机）提供五种外部接入面：Web `/api` Remote、ACP profile、SDK profile、webhook、进程内插件。QQ 聊天需要同时满足：投递消息、拿回复、转发提问与审批、复用会话、限制工具面。
+原结论是「Web `/api` + Cookie 离线铸造」，理由是唯一能同时拿投递、回复、提问、审批。调研后这个理由站不住了：
 
-关键差异在「交互」：Web 有 `ask_user_question` 与工具审批事件；ACP 只有权限提示（无提问）；SDK 协议两端都没有服务端→客户端请求；webhook 与插件不适用。
+- DSH `0.1.1-rc.2` 起 `/api/*` **强制浏览器 Cookie**，本机回环也不例外（`banana770` README 明确记录，裸 HTTP 401）。
+- 4/6 个实现选择 **DSH 插件**形态：进程内直接拿 `agents`、`agentPresets.mount`、`session/event`，不需要鉴权，也能拿审批按钮（`988hj7tczd-oss/dsh-im-qq` 的 ✅⭐❌ 内联按钮）。
+- 独立进程为了用 `/api`，得自己搭一个免认证适配层（`banana770` 的 `/qqbapi/*`），本质还是插件。
 
 ## 决策
 
-1. 主通道用 **Web profile 的 `/api`**：`POST /api/<namespace>/<method>` 做一元调用，`/api/remote.mux` + `session/follow` 拿事件流。
-2. 协议细节全部收敛在 `dsh/web-adapter` 单模块，业务代码只依赖 `DshAdapter` 接口。
-3. 不在 M0–M1 实现 ACP/SDK；M2 只定义接口，M3 按「无人值守任务」场景接 ACP。
-4. 鉴权用 `~/.dsh/.credentials.yaml` 里的持久签名密钥**离线铸造 Cookie**，不读进程日志里的 token（`0.1.7` 起 token 只存在内存，读到的是陈旧值）。
+1. 主路径：**DSH 插件（cordis bundle）**，进程内调用：
+   - `agentPresets.mount()` 挂 preset；
+   - `agent.followup()` 投递；
+   - `session/event` 订阅出站与交互；
+   - `settings` 注册配置卡。
+2. 插件向本机暴露**带 token 的本地路由**（`/qqbapi/*`），供独立的 QQ 连接进程调用；路由只监听 `127.0.0.1`。
+3. Web `/api` 保留为**旧版 DSH 与外部脚本**的兼容路径，不作为主路径。
+4. 所有 DSH 版本差异收敛在插件里，QQ 连接进程只依赖 `Transport` 与本地路由。
 
 ## 理由
 
-- 只有 Web 通道能覆盖 C1–C5（见 [技术选型 3.1](../01-tech-selection.md#31-能力对照)），而 QQ 场景里「agent 反问一句」是常态，断链代价高。
-- qq-bridge 已在 `0.2.1-rc.2` 上逐项实测这条路，踩过的坑有记录（见 [qq-bridge 基线](../references/qq-bridge-baseline.md)），复用成本最低。
-- 把版本敏感面集中到一个模块，升级 DSH 时只改一处；这是「版本敏感」不等于「不能选」的关键设计。
+- 免 Cookie：插件在进程内，绕开 `/api` 的浏览器鉴权与 token 轮换。
+- 拿得全：`session/event` 有完整事件流与交互，审批可以直接出按钮（官方 Bot 路线）。
+- 生态验证：4/6 实现走插件，且 `banana770` 的「独立进程 + 插件适配层」混合已跑通 0.2.1-rc.2。
+- 版本适配集中：插件与 DSH 同进程，版本不匹配时启动即报错，不会「静默失效」。
 
 ## 风险与缓解
 
 | 风险 | 缓解 |
 |---|---|
-| DSH 升级改协议，静默失效 | 适配层单点 + 探针 + 每个里程碑的验收矩阵；升级先跑 `npm run verify:adaptation` |
-| Cookie 铸造依赖 `~/.dsh` 结构 | 探针检测 `.credentials.yaml` 是否存在 `client-connection/browser-session`；缺失时回退到显式 token 并明确报错 |
-| `/api` 是 Web BFF，非稳定公开 API | 文档明确「非稳定」；适配层保留版本分支；M3 评估迁移 ACP |
-| ACP/SDK 不支持审批，切换场景时行为不一致 | 在 `DshAdapter` 上标注能力位（`supportsInteraction`），业务层按能力降级并提示 |
+| 插件 API 是内部接口，随版本变 | 适配层单点；启动校验 `agents`/`agentPresets`/`settings` 三项；不兼容拒绝启动 |
+| 插件加载失败导致无响应 | 安装脚本自检 + `dsh --dump-config` 验证插件行 |
+| 本地免认证路由被滥用 | 只绑 127.0.0.1 + 每次启动生成随机 token；不暴露到局域网 |
+| 插件崩溃影响 DSH | QQ transport 在独立进程，插件只做适配，崩溃面小；必要时降级到 `/api` |
 
 ## 验证
 
-- 探针：`node checks/probe-dsh.mjs --json` 输出 `webApi.reachable=true`、`auth.cookieMinted=true`。
-- 端到端：[tasks/02-minimal-loop.md](../../tasks/02-minimal-loop.md) 的 `npm run test:e2e` 断言「投递 → 回复」。
-- 交互：[tasks/05-security-baseline.md](../../tasks/05-security-baseline.md) 的审批往返用例（同意/拒绝/超时三条）。
+- 最小插件冒烟：`npm run test:plugin-smoke` → 插件加载、`/qqbapi/health` 返回版本。
+- 版本门禁：`npm run test:version-gate` → 不兼容的 DSH 版本拒绝启动并提示。
+- 兼容回退：`npm run test:web-api-fallback` → 插件不可用时走 `/api` 仍能收发。
+- 安全：`node checks/check-local-route.mjs` → 非 127.0.0.1 访问被拒、无 token 401。

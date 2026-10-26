@@ -1,40 +1,52 @@
-# ADR-001：QQ 协议端选 OneBot v11
+# ADR-001：QQ 协议端双路线
 
 ## 状态
 
-待确认。推荐值：**OneBot v11 契约，默认实现 NapCat，SnowLuma 作为兼容目标**。
+待确认。推荐值：**NapCat（OneBot 11）默认，QQ 官方 Bot 作为第二路线；两者共享上层，只换 transport**。
 
 ## 背景
 
-桥接需要一个能收发 QQ 消息的协议端。候选：NapCat、SnowLuma、QQ 官方 Bot API、AstrBot。
+调研了 6 个已有实现（见 [prior art](../references/prior-art.md)），生态明确分成两条路线：
 
-本机现状：NapCat 已随 `D:\qqaibot` 运行（WebUI 6099、OneBot 反向 WS 6199），且已在工作区根 `AGENTS.md` 登记；SnowLuma 未安装。qq-bridge 的实测路线是 SnowLuma。
+- **NapCat / OneBot 11**：`cheems135/dsh-qq-bridge`、`sj244/dsh-qq-bridge`、`Derpyu520/qq-bridge`（SnowLuma，同属 OneBot）。
+- **QQ 官方 Bot**：`988hj7tczd-oss/dsh-im-qq`、`banana770/dsh-qq-bridge`。
+
+原结论「只选 NapCat」只覆盖了第一条。两条路线各有成熟实现，且能力不同：
+
+| 能力 | NapCat | 官方 Bot |
+|---|---|---|
+| 审批 | 文字回复 | **原生内联按钮** |
+| 群聊触发 | 自定义（@/关键词/概率） | 只能 @ |
+| 主动消息 | 无限制 | 4 条/月/人/群 |
+| 门槛 | 扫码登录 | 认证 + 公域 + 测试人员 |
+| 封号风险 | 有 | 无（合规） |
 
 ## 决策
 
-1. 桥接只依赖 **OneBot v11 标准事件与 API**，不 import 任何协议端 SDK。
-2. 默认实现指向本机 **NapCat**（WS 客户端 + HTTP API）。
-3. **SnowLuma** 作为第二个适配目标，通过配置切换，不写第二套桥接。
-4. 官方 Bot API 与 AstrBot 不进入 M0–M3。
+1. 定义 `Transport` 接口（收事件、发消息、发按钮），上层只依赖它。
+2. **默认实现 NapCat**：本机已有、零审核、多模态自由，适合个人自用。
+3. **第二实现官方 Bot**：M4 评估，优先服务「需要按钮审批 / 对外稳定」的场景。
+4. 两条路线共享 `guard / mapping / persona / outbound`，禁止在业务层写 `if (napcat)`。
+5. 官方 Bot 的配额与被动窗口写进 `outbound` 的发送预算，不散落在业务代码。
 
 ## 理由
 
-- OneBot v11 是事实标准，换协议端只改连接参数，不改业务代码。
-- NapCat 在本机已跑，零新增安装；不需要向 QQ 客户端注入原生组件（SnowLuma 需要），合规与可复现性更好。
-- 不 import 协议端 SDK 可以避免重蹈 `@snowluma/sdk` 的 ESM 打包 bug 与版本锁定（qq-bridge 需要 postinstall 打补丁）。
-- SnowLuma 保留为兼容目标，是因为它的事件覆盖更全（心跳 `status.good`、`bot_status`），适合诊断「连上了但收不到」。
+- 两条路线都有真实用户与成熟代码，单选一条会丢掉另一条的体验优势（尤其是按钮审批）。
+- `Transport` 抽象的成本可控（两个实现，各 ~500 行），而收益是「同一套体验跑两种账号」。
+- 默认 NapCat 是因为它无审核门槛、本机已在跑；官方 Bot 作为合规升级路径，不阻塞 M0。
 
 ## 风险与缓解
 
 | 风险 | 缓解 |
 |---|---|
-| NapCat 被官方风控/封号 | 只用小号；限制发送频率；不在群里刷屏；文档明示风险 |
-| 两个协议端事件字段不一致 | 适配层只依赖 v11 必选字段；可选字段缺省不报错；用回放 fixture 测 |
-| NapCat 与现有 AstrBot 抢同一个 QQ 账号 | 桥接用独立小号；不接管 `D:\qqaibot` 的账号与端口 |
-| 协议端升级破坏事件形状 | 探针记录协议端版本与 `get_version_info` 输出，进版本台账 |
+| NapCat 封号 | 小号、频率限制、文档明示、不自动加好友/改资料 |
+| 官方 Bot 审核失败/配额 | 沙箱先用；主动消息全部走被动窗口；配额计入发送预算 |
+| 两套 transport 维护成本 | 接口窄（4 个方法）；契约测试同一套用例跑两个实现 |
+| 事件字段差异 | 只依赖必选字段；差异在 transport 内归一化，不进业务层 |
 
 ## 验证
 
-- [tasks/01-probe-dsh.md](../../tasks/01-probe-dsh.md)：探针输出 `onebot.version` 与 `onebot.selfId`。
-- [tasks/03-qq-channel.md](../../tasks/03-qq-channel.md)：`node checks/probe-onebot.mjs` 能收到 `message/private` 与 `message/group` 两类事件。
-- 回放测试：`npm test` 里用两份 fixture（NapCat / SnowLuma 各一份）跑同一套解析断言。
+- 契约测试：`npm run test:transport-contract` → 两个实现跑同一套 12 条用例。
+- NapCat：[tasks/03-qq-channel.md](../../tasks/03-qq-channel.md) 的 `node checks/probe-onebot.mjs`。
+- 官方 Bot：`node checks/probe-official.mjs` → 沙箱内收到一条 `C2C_MESSAGE_CREATE`。
+- 审批差异：[tasks/05-security-baseline.md](../../tasks/05-security-baseline.md) 的文字审批 + [tasks/09](../../tasks/09-multimodal.md) 之后的按钮审批。

@@ -6,9 +6,9 @@
 
 | ID | 主题 | 推荐值 | 备选 | 影响面 | 状态 |
 |---|---|---|---|---|---|
-| D1 | QQ 协议端 | OneBot v11 + NapCat 默认 | SnowLuma / 官方 Bot / AstrBot | 连接层、事件解析 | 待确认 |
-| D2 | DSH 接入通道 | Web `/api` + Adapter 抽象 | ACP / SDK / webhook / 插件 | 桥接核心、升级适配 | 待确认 |
-| D3 | 进程形态 | 独立进程 | 进程内插件 | 部署、故障隔离 | 待确认 |
+| D1 | QQ 协议端 | 双路线：NapCat 默认 + 官方 Bot | SnowLuma / AstrBot | 连接层、事件解析 | 待确认 |
+| D2 | DSH 接入 | 插件适配层（进程内）/ Web `/api` 兼容 | ACP / SDK | 桥接核心、升级适配 | 待确认 |
+| D3 | 进程形态 | 混合：QQ 连接独立 + DSH 侧插件 | 纯插件 / 纯独立 | 部署、故障隔离 | 待确认 |
 | D4 | 会话映射 | 1 QQ 会话 = 1 DSH 会话 | 每条消息新会话 | 成本、上下文、安全指纹 | 待确认 |
 | D5 | 人格分层 | preset + roles 两层 | 单层 prompt | 人格维护、成本 | 待确认 |
 | D6 | 安全模型 | fail-closed + 工具裁剪 | 事后审计 | 全部出站路径 | 待确认 |
@@ -22,9 +22,9 @@
 
 | ADR | 决策 | 状态 |
 |---|---|---|
-| [ADR-001-qq-endpoint.md](ADR-001-qq-endpoint.md) | QQ 协议端选 OneBot v11，NapCat 默认 | 待确认 |
-| [ADR-002-dsh-access.md](ADR-002-dsh-access.md) | DSH 接入默认 Web `/api`，ACP/SDK 备选 | 待确认 |
-| [ADR-003-process-shape.md](ADR-003-process-shape.md) | 桥接作为独立进程 | 待确认 |
+| [ADR-001-qq-endpoint.md](ADR-001-qq-endpoint.md) | QQ 协议端双路线：NapCat 默认 + 官方 Bot | 待确认 |
+| [ADR-002-dsh-access.md](ADR-002-dsh-access.md) | DSH 接入走进程内插件适配层，Web `/api` 仅兼容 | 待确认 |
+| [ADR-003-process-shape.md](ADR-003-process-shape.md) | 混合形态：QQ 连接独立 + DSH 侧插件 | 待确认 |
 | [ADR-004-session-mapping.md](ADR-004-session-mapping.md) | 1:1 会话映射并持久化 | 待确认 |
 | [ADR-005-persona-layers.md](ADR-005-persona-layers.md) | 人格两层：行为与人设分离 | 待确认 |
 | [ADR-006-security.md](ADR-006-security.md) | fail-closed 安全模型 | 待确认 |

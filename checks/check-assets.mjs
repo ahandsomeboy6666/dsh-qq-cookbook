@@ -71,6 +71,7 @@ const REQUIRED = [
   'docs/decisions/ADR-010-group-chat.md',
   'docs/decisions/ADR-011-onboarding.md',
   'docs/references/dsh-capability-matrix.md',
+  'docs/references/prior-art.md',
   'docs/references/qq-bridge-baseline.md',
   'docs/templates/task-card.md',
   'docs/templates/proposal.md',

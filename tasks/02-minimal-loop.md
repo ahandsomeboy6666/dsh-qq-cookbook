@@ -14,8 +14,9 @@ QQ 私聊发「ping」，30 秒内收到 agent 回复「pong」。
 ## 输出
 
 - 新增 `src/main.mjs`（启动、装配、单实例锁）
-- 新增 `src/onebot/`（连接 + 事件归一化）
-- 新增 `src/dsh/web-adapter.mjs`（鉴权、RPC、事件流、会话）
+- 新增 `src/transport/onebot.mjs`（连接、事件、发送）
+- 新增 `src/dsh/plugin-adapter/`（插件侧：免认证本地路由、preset 挂载、事件与交互回调）
+- 新增 `src/dsh/web-adapter.mjs`（standalone 兼容路径，M2 才启用）
 - 新增 `tests/e2e.test.mjs` 与 `npm run test:e2e`
 - `package.json` 增加 `start`、`test`、`test:e2e`
 
