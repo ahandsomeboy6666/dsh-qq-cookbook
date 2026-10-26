@@ -58,6 +58,7 @@ const REQUIRED = [
   'docs/05-roadmap.md',
   'docs/06-methodology.md',
   'docs/07-ux-spec.md',
+  'docs/10-current-plan.md',
   'docs/decisions/README.md',
   'docs/decisions/ADR-001-qq-endpoint.md',
   'docs/decisions/ADR-002-dsh-access.md',

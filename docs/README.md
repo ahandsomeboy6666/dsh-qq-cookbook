@@ -18,6 +18,7 @@
 | [docs/02-architecture.md](02-architecture.md) | 组件、入站/出站数据流、会话映射、失败模式 | 草案 |
 | [docs/03-threat-model.md](03-threat-model.md) | 信任边界、攻击面、六条红线与对策 | 草案 |
 | [docs/07-ux-spec.md](07-ux-spec.md) | 体验目标、11 个场景、U1–U10 指标、文案与群聊礼仪 | 草案 |
+| [docs/10-current-plan.md](10-current-plan.md) | **当前方案一页纸**：cheems + NapCat + 30 元授权 + 两套人设 | 已拍板 |
 
 ## 执行
 
