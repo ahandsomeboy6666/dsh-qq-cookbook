@@ -49,7 +49,9 @@ const REQUIRED = [
   'README.md',
   'package.json',
   '.gitignore',
+  '.gitmessage',
   'docs/README.md',
+  'docs/FACTS.md',
   'docs/00-proposal.md',
   'docs/01-tech-selection.md',
   'docs/02-architecture.md',
@@ -265,6 +267,15 @@ try {
   check('README 检查脚本数量', declared === scripts.length, `README 写 ${Number.isNaN(declared) ? '未写' : declared}，实际 ${scripts.length}`)
 } catch (err) {
   check('README 检查脚本数量', false, String(err.message))
+}
+
+// ---------------------------------------------------------------- 10. 事实台账
+try {
+  const facts = await read('docs/FACTS.md')
+  const missing = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6'].filter((id) => !facts.includes(`| ${id} |`))
+  check('FACTS.md 覆盖 F1–F6', missing.length === 0, missing.length ? `缺：${missing.join('、')}` : '')
+} catch (err) {
+  check('FACTS.md 覆盖 F1–F6', false, String(err.message))
 }
 
 // ---------------------------------------------------------------- 输出

@@ -63,6 +63,23 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 
 **不允许只改主文档就宣布完成。** 这是本项目已经踩过的坑：选型改了 4 次（Web `/api` → 插件适配 → 官方 Bot → cheems），旧命令和旧结论散落在 ADR、任务卡、参考基线里，直到用户指出才补。
 
+## 三之三、开发实践规范（每轮收尾）
+
+1. **新增文档** → 登记 [docs/README.md](docs/README.md)；涉及当前事实 → 登记 [docs/FACTS.md](docs/FACTS.md)。
+2. **改事实** → 按 FACTS.md 的「引用点」逐个更新；旧值所在文档标「归档 / 已取代 / 历史」。
+3. **跑检查**：
+
+   ```powershell
+   node checks/check-assets.mjs
+   node checks/check-consistency.mjs
+   ```
+
+   两条必须全绿才允许汇报。
+4. **commit 用模板**：首次克隆执行 `git config commit.template .gitmessage`。
+5. **commit message 必须写事实变更**：`事实变更：F1 cheems → 官方 Bot`；没有变更写「无」。
+
+违反任一条 = 没做完，不许用「应该没问题」代替。
+
 ## 四、红绿流程
 
 ```

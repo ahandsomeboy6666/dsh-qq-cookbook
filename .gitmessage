@@ -1,0 +1,11 @@
+
+# <type>: <摘要>
+#
+# type: feat | fix | docs | chore | refactor | test
+#
+# 事实变更（没有就写「无」）：
+#   事实变更：F1 cheems 插件 → 官方 Bot
+#
+# 验收：
+#   node checks/check-assets.mjs        → PASS __ / FAIL 0
+#   node checks/check-consistency.mjs   → 一致

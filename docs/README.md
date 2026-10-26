@@ -20,6 +20,12 @@
 | [docs/07-ux-spec.md](07-ux-spec.md) | 体验目标、11 个场景、U1–U10 指标、文案与群聊礼仪 | 已定 |
 | [docs/10-current-plan.md](10-current-plan.md) | **当前方案一页纸**：cheems + NapCat + 30 元授权 + 两套人设 | 已拍板 |
 
+## 事实台账
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/FACTS.md](FACTS.md) | 当前事实的单一真源、引用点与检查规则（F1–F6） | 已定 |
+
 ## 执行
 
 | 文件 | 一句话 | 状态 |
