@@ -352,6 +352,36 @@ try {
   check('FACTS 真源存在', false, String(err.message))
 }
 
+// ---------------------------------------------------------------- 14. FACTS 引用点内容
+try {
+  const facts = await read('docs/FACTS.md')
+  const rows = facts.split('\n').filter(l => /^\|\s*F\d+\s*\|/.test(l))
+  const problems = []
+  for (const row of rows) {
+    const cells = row.split('|').map(s => s.trim())
+    const id = cells[1]
+    const sourceCell = cells[4] ?? ''
+    const refCell = cells[5] ?? ''
+    const keyword = (cells[6] ?? '').replace(/`/g, '')
+    const sourcePath = sourceCell.match(/\]\(([^)]+)\)/)?.[1] ?? sourceCell.match(/`([^`]+)`/)?.[1] ?? ''
+    const sourceNeedle = sourcePath.split('/').slice(-2).join('/')
+    const refs = [...refCell.matchAll(/`([^`]+)`/g)].map(m => m[1])
+    for (const ref of refs) {
+      const text = await read(ref).catch(() => null)
+      if (text === null) {
+        problems.push(`${id}: 引用点不存在 ${ref}`)
+        continue
+      }
+      if (keyword && text.includes(keyword)) continue
+      if (sourceNeedle && text.includes(sourceNeedle)) continue
+      problems.push(`${id}: ${ref} 既没有「${keyword}」也没有真源「${sourceNeedle}」`)
+    }
+  }
+  check('FACTS 引用点真实引用', problems.length === 0, problems.join('；'))
+} catch (err) {
+  check('FACTS 引用点真实引用', false, String(err.message))
+}
+
 // ---------------------------------------------------------------- 输出
 const passed = results.filter(r => r.ok).length
 const failed = results.length - passed
