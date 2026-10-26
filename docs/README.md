@@ -1,0 +1,55 @@
+# 文档索引
+
+每篇一句话说明 + 状态。状态含义：**现行**（当前有效）、**草案**（待用户确认）、**参考**（外部事实基线）。
+
+## 入口
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [README.md](../README.md) | 全貌、一分钟选型、最小回环 | 草案 |
+| [AGENTS.md](../AGENTS.md) | AI 执行者规范：事实纪律、红绿流程、任务卡 | 草案 |
+
+## 提案与选型
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/00-proposal.md](00-proposal.md) | 为什么做、做到什么程度、不做什么、成功标准 | 草案 |
+| [docs/01-tech-selection.md](01-tech-selection.md) | 五条 DSH 接入通道、四类 QQ 协议端、推荐堆栈 | 草案 |
+| [docs/02-architecture.md](02-architecture.md) | 组件、入站/出站数据流、会话映射、失败模式 | 草案 |
+| [docs/03-threat-model.md](03-threat-model.md) | 信任边界、攻击面、六条红线与对策 | 草案 |
+
+## 执行
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/04-acceptance.md](04-acceptance.md) | 每个里程碑的验收命令、期望输出、红灯示例 | 草案 |
+| [docs/05-roadmap.md](05-roadmap.md) | M0–M3 里程碑、依赖图、任务卡索引 | 草案 |
+| [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 草案 |
+
+## 决策记录（ADR）
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/decisions/README.md](decisions/README.md) | 决策台账：每条推荐值、备选、影响、状态 | 草案 |
+| [docs/decisions/ADR-001-qq-endpoint.md](decisions/ADR-001-qq-endpoint.md) | QQ 协议端选 OneBot v11（NapCat 默认 / SnowLuma 备选） | 待确认 |
+| [docs/decisions/ADR-002-dsh-access.md](decisions/ADR-002-dsh-access.md) | DSH 接入默认 Web `/api`，ACP/SDK 作为可选自动化通道 | 待确认 |
+| [docs/decisions/ADR-003-process-shape.md](decisions/ADR-003-process-shape.md) | 独立桥接进程，不做进程内插件 | 待确认 |
+| [docs/decisions/ADR-004-session-mapping.md](decisions/ADR-004-session-mapping.md) | 1 个 QQ 会话 = 1 个 DSH 会话，映射持久化 | 待确认 |
+| [docs/decisions/ADR-005-persona-layers.md](decisions/ADR-005-persona-layers.md) | 人格两层：preset 管行为，roles 管人设 | 待确认 |
+| [docs/decisions/ADR-006-security.md](decisions/ADR-006-security.md) | fail-closed 白名单 + preset 工具裁剪 + 发送审计 | 待确认 |
+
+## 外部事实基线
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/references/dsh-capability-matrix.md](references/dsh-capability-matrix.md) | DSH 五条接入面的能力对照，每条标版本与出处 | 参考 |
+| [docs/references/qq-bridge-baseline.md](references/qq-bridge-baseline.md) | qq-bridge 的实测结论：哪些可复用、哪些需复核 | 参考 |
+
+## 可复制模板
+
+| 文件 | 一句话 | 状态 |
+|---|---|---|
+| [docs/templates/task-card.md](templates/task-card.md) | 任务卡模板（五段 + 可执行验收） | 参考 |
+| [docs/templates/proposal.md](templates/proposal.md) | 提案模板（目标/非目标/成功标准/假设/风险） | 参考 |
+| [docs/templates/adr.md](templates/adr.md) | ADR 模板（六段 + 状态机） | 参考 |
+| [docs/templates/AGENTS.skeleton.md](templates/AGENTS.skeleton.md) | 新项目 AGENTS.md 骨架（30 分钟初始化） | 参考 |
