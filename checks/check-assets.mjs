@@ -50,6 +50,8 @@ const REQUIRED = [
   'package.json',
   '.gitignore',
   '.gitmessage',
+  'cli.mjs',
+  'docs/templates/ci-check.yml',
   'docs/README.md',
   'docs/FACTS.md',
   'docs/00-proposal.md',

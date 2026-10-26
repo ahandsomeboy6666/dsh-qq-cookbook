@@ -11,6 +11,7 @@
  */
 const args = process.argv.slice(2)
 const JSON_MODE = args.includes('--json')
+const REQUIRE = args.includes('--require')
 const opt = (name) => {
   const i = args.indexOf(name)
   return i >= 0 ? args[i + 1] : undefined
@@ -63,4 +64,4 @@ if (JSON_MODE) {
   console.log('')
 }
 
-process.exit(0)
+process.exit(REQUIRE && !out.connected ? 1 : 0)

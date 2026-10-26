@@ -70,11 +70,12 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 3. **跑检查**：
 
    ```powershell
-   node checks/check-assets.mjs
-   node checks/check-consistency.mjs
+   node cli.mjs check      # 静态门禁：资产 + 事实一致性
+   node cli.mjs doctor     # 环境事实：DSH / NapCat / 插件
+   node cli.mjs status     # 全状态：+ 人设 / 额度 / 浏览器
    ```
 
-   两条必须全绿才允许汇报。
+   `check` 必须全绿才允许汇报；`doctor`/`status` 的 FAIL 表示“未就绪”，照实写。
 4. **commit 用模板**：首次克隆执行 `git config commit.template .gitmessage`。
 5. **commit message 必须写事实变更**：`事实变更：F1 cheems → 官方 Bot`；没有变更写「无」。
 

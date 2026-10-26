@@ -37,12 +37,15 @@ node checks/check-persona.mjs
 node checks/check-browser.mjs
 node checks/check-budget.mjs
 
-# 随时：资产完整性 + 事实一致性
-node checks/check-assets.mjs
-node checks/check-consistency.mjs
+# 随时：静态门禁 / 环境事实 / 全状态
+node cli.mjs check
+node cli.mjs doctor
+node cli.mjs status
 ```
 
 前置条件、失败排查、每步期望输出见 [验收矩阵](docs/04-acceptance.md)。任务卡见 [tasks/README.md](tasks/README.md)。
+
+> CI 模板在 [docs/templates/ci-check.yml](docs/templates/ci-check.yml)：复制到 `.github/workflows/` 即可启用；push 时 token 需要 `workflow` 权限。
 
 ## 目录
 
