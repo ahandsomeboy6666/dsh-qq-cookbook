@@ -47,6 +47,7 @@ DSH 是本地优先的 coding agent，入口是 Web GUI / 桌面端。QQ 是国�
 
 ## 四、非目标
 
+- **不自建桥接**：直接部署 `cheems135/dsh-qq-bridge` 插件 + NapCat；自建路线（`tasks/01-09`）已归档，只作参考。
 - **不重写 qq-bridge**，也不复制它的单文件结构。它只作为事实基线与功能参照。
 - **不做 QQ 协议逆向**：只消费 OneBot v11 标准事件，不碰客户端注入。
 - **不做多租户 / 多账号 SaaS**：单机、单账号、个人使用优先。
@@ -71,7 +72,7 @@ M3/M4 完成时追加 UX 指标（[UX 规格第三节](07-ux-spec.md#三指标�
 
 | # | 假设 | 验证方式 | 失败后果 |
 |---|---|---|---|
-| A1 | 本机 DSH `0.2.0-rc.2` 的 Web `/api` 协议与 qq-bridge 记录的 `0.2.1-rc.2` 一致 | [tasks/01-probe-dsh.md](../tasks/01-probe-dsh.md) | 需按版本分支适配，M0 延期 |
+| A1 | cheems 插件与 NapCat 在本机 `0.2.0-rc.2` 上可加载、可收发 | [tasks/10-onboard-env.md](../tasks/10-onboard-env.md)、[11](../tasks/11-install-cheems.md) | 需要换官方 Bot 路线或自建 |
 | A2 | NapCat 的 OneBot v11 事件形状与 SnowLuma 足够一致，桥接不需要为协议端写两套 | [tasks/03-qq-channel.md](../tasks/03-qq-channel.md) | 需要协议端适配层，工作量 +2 人日 |
 | A3 | `ask_user_question` 与工具审批可以稳定转发到 QQ 并回填 | M1 验收脚本 | 交互断链，agent 长任务会卡住 |
 | A4 | 单条 QQ 消息 + 历史注入不超过模型上下文，长群聊需要压缩 | token 记账脚本 | 成本失控 |
@@ -94,7 +95,7 @@ M3/M4 完成时追加 UX 指标（[UX 规格第三节](07-ux-spec.md#三指标�
 
 | # | 决策 | 推荐 | 备选 |
 |---|---|---|---|
-| D1 | QQ 协议端 | 官方 Bot（扫码零配置、按钮审批） | NapCat / SnowLuma |
+| D1 | QQ 协议端 | cheems 插件 + NapCat（小号） | 官方 Bot / SnowLuma |
 | D2 | DSH 接入通道 | Web `/api`（功能最全） | ACP / SDK（更正式，但不支持审批转发） |
 | D3 | 进程形态 | 独立桥接进程 | DSH 进程内插件 |
 | D4 | 会话映射 | 1 QQ 会话 = 1 DSH 会话，持久化 | 每条消息新会话（丢弃上下文） |

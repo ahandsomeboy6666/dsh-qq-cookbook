@@ -1,9 +1,9 @@
 {
   "name": "dsh-qq-cookbook",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "把 DeepSeek Harness 接入 QQ 的配方书：技术选型、安全边界、分阶段任务卡与可执行验收。",
+  "description": "把 DeepSeek Harness 接入 QQ 的选型与部署资产：cheems 插件 + NapCat、体验评分、30 元零花钱授权与可执行验收。",
   "license": "MIT",
   "engines": {
     "node": ">=22"
@@ -11,7 +11,12 @@
   "scripts": {
     "check:assets": "node checks/check-assets.mjs",
     "probe:dsh": "node checks/probe-dsh.mjs",
-    "check": "node checks/check-assets.mjs && node checks/probe-dsh.mjs",
+    "probe:onebot": "node checks/probe-onebot.mjs",
+    "check:install": "node checks/check-install.mjs",
+    "check:persona": "node checks/check-persona.mjs",
+    "check:budget": "node checks/check-budget.mjs",
+    "check:browser": "node checks/check-browser.mjs",
+    "check": "node checks/check-assets.mjs && node checks/probe-dsh.mjs && node checks/probe-onebot.mjs",
     "test": "node --test tests/"
   }
 }

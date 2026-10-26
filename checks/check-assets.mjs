@@ -89,8 +89,18 @@ const REQUIRED = [
   'tasks/07-ux-streaming.md',
   'tasks/08-interrupt.md',
   'tasks/09-multimodal.md',
+  'tasks/10-onboard-env.md',
+  'tasks/11-install-cheems.md',
+  'tasks/12-persona.md',
+  'tasks/13-allowance-browser.md',
   'checks/check-assets.mjs',
-  'checks/probe-dsh.mjs'
+  'checks/probe-dsh.mjs',
+  'checks/probe-onebot.mjs',
+  'checks/check-install.mjs',
+  'checks/check-persona.mjs',
+  'checks/check-budget.mjs',
+  'checks/check-browser.mjs',
+  'config.example.json'
 ]
 
 const missing = []

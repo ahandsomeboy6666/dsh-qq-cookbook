@@ -1,41 +1,48 @@
 # 任务总览
 
-流程见 [AGENTS.md](../AGENTS.md)：先跑红，再写绿。每张卡的五段见 [任务卡模板](../docs/templates/task-card.md)。
+> **主线已切换**：当前方案是 **cheems135/dsh-qq-bridge 插件 + NapCat**（见 [当前方案](../docs/10-current-plan.md)）。
+>
+> `01-09` 是「自建桥接」路线，已**归档**，只作参考，不再推进。主线是 `10-13` 的部署与验收。
 
-## 状态
+## 主线（D 系列）
 
-| # | 任务 | 里程碑 | 依赖 | 验收命令 | 状态 |
+| # | 任务 | 阶段 | 依赖 | 验收命令 | 状态 |
 |---|---|---|---|---|---|
-| 01 | [DSH 环境探针](01-probe-dsh.md) | M0 | 无 | `node checks/probe-dsh.mjs --json` | 📋 待做 |
-| 02 | [最小收发回环](02-minimal-loop.md) | M0 | 01 | `npm run test:e2e` | 📋 待做 |
-| 03 | [OneBot 通道接入](03-qq-channel.md) | M0 | 01 | `node checks/probe-onebot.mjs` | 📋 待做 |
-| 04 | [会话映射持久化](04-session-mapping.md) | M2 | 02 | `npm test -- mapping` | 📋 待做 |
-| 05 | [安全基线与交互转发](05-security-baseline.md) | M1 | 02 | `node checks/attack-drill.mjs` | 📋 待做 |
-| 06 | [人格两层与热生效](06-persona-layers.md) | M2 | 04 | `node checks/check-persona.mjs` | 📋 待做 |
-| 07 | [首条早发与分条](07-ux-streaming.md) | M3 | 02 | `npm run test:ux-split` | 📋 待做 |
-| 08 | [打断、补充与并发](08-interrupt.md) | M3 | 02、05 | `npm run test:ux-interrupt` | 📋 待做 |
-| 09 | [图片入站与媒体上限](09-multimodal.md) | M4 | 02、05 | `npm run test:vision` | 📋 待做 |
+| 10 | [环境就绪](10-onboard-env.md) | D0 | 无 | `node checks/probe-onebot.mjs --json` | 📋 待做 |
+| 11 | [安装 cheems 并打通回环](11-install-cheems.md) | D1 | 10 | `node checks/check-install.mjs --json` | 📋 待做 |
+| 12 | [私聊/群聊两套人设](12-persona.md) | D2 | 11 | `node checks/check-persona.mjs` | 📋 待做 |
+| 13 | [浏览器能力与 30 元零花钱](13-allowance-browser.md) | D3 | 11 | `node checks/check-budget.mjs` | 📋 待做 |
 
 ## 建议顺序
 
 ```
-01 探针 ──► 03 通道 ──► 02 回环 ──► 05 安全 ──► 04 会话 ──► 06 人格
-                                                    │
-                                                    ├──► 07 分条 ──► 08 打断
-                                                    └──► 09 多模态
+10 环境 ──► 11 安装 ──► 12 人设 ──► 13 能力与零花钱
 ```
 
-01 先做：不确认版本与鉴权就写代码，等于赌 DSH 协议没变。
-03 第二：先能把 QQ 事件稳定收进来，与 DSH 解耦。
-02 第三：第一个完整往返，项目的 hello world。
-05 第四：在扩大使用范围之前立边界。
-04、06：会话与人格建立在稳定回环之上。
-07、08、09：体验三件套，按 [UX 规格](../docs/07-ux-spec.md) 的指标验收。
+- 10 先做：NapCat 扫码、DSH 版本、插件未装清单，一次确认。
+- 11：装插件、填 wsUrl/token、私聊发 ping。
+- 12：私聊「活泼热情可爱温柔关心」，群聊「好玩会玩梗」。
+- 13：Playwright + 30 元授权（受益人只有 owner 和 self）。
+
+## 已归档（自建路线，只作参考）
+
+| # | 任务 | 为什么归档 |
+|---|---|---|
+| 01 | DSH 环境探针 | 探针仍有用，已并入 `checks/probe-dsh.mjs` |
+| 02 | 最小收发回环 | 自建 transport，已被 cheems 取代 |
+| 03 | OneBot 通道接入 | 同上 |
+| 04 | 会话映射持久化 | cheems 自带 |
+| 05 | 安全基线与交互转发 | cheems 自带（文字审批） |
+| 06 | 人格两层 | cheems 面板人设取代 |
+| 07 | 首条早发与分条 | cheems 的 `|||` 分条取代 |
+| 08 | 打断、补充与并发 | cheems 的 `/cancel` 取代 |
+| 09 | 图片入站与媒体上限 | cheems 多模态取代 |
+
+这些卡保留是为了：如果 cheems 路线走不通，可以按它们自建；不要主动推进。
 
 ## 已定的背景
 
 - 本机 DSH `0.2.0-rc.2`，profile 仅 `web` / `desktop`。
-- 协议端默认 NapCat（本机已有），SnowLuma 备选。
-- 参考实现 qq-bridge 的结论见 [qq-bridge 基线](../docs/references/qq-bridge-baseline.md)。
-- 决策未拍板前不写对应实现，见 [决策台账](../docs/decisions/README.md)。
-- 体验目标与指标见 [UX 规格](../docs/07-ux-spec.md)：**功能实现但指标不达标，不算做完。**
+- 协议端 **NapCat**（QQ 小号，只加 owner 好友，只进群）。
+- 接入 **cheems135/dsh-qq-bridge**（官方仓库，MIT）。
+- 零花钱：小号只充 30 元余额、受益人只有 owner/self、禁转账（见 [config.example.json](../config.example.json)）。

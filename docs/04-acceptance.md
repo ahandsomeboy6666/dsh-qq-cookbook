@@ -6,6 +6,24 @@
 >
 > 体验类指标（U1–U10）见 [UX 规格](07-ux-spec.md#三指标可验收)，本文只定义怎么跑。
 
+## 零、当前路线（部署 cheems）
+
+> 主线是 [当前方案](10-current-plan.md)：cheems 插件 + NapCat。下面是 D0–D3 的验收；M0–M4（自建路线）保留在文末作参考。
+
+| # | 验收 | 命令 | 期望 |
+|---|---|---|---|
+| D0-1 | NapCat 可达 | `node checks/probe-onebot.mjs --json` | `connected=true`，`selfId` 非空 |
+| D0-2 | DSH 版本 | `node checks/probe-dsh.mjs --json` | `dshVersion` 非空 |
+| D0-3 | 插件未装清单 | `node checks/check-install.mjs --json` | `installed` 布尔 + `todo` |
+| D1-1 | 插件已装 | `node checks/check-install.mjs --json` | `installed=true` |
+| D1-2 | 回环 | 人工：QQ 私聊发「ping」 | 30s 内有回复 |
+| D2-1 | 两套人设 | `node checks/check-persona.mjs` | 私聊/群聊各一份，≤6000 字，无工具词 |
+| D2-2 | 人设生效 | 人工：私聊说「今天好累」 | 先安慰，不讲课 |
+| D3-1 | 浏览器能力 | `node checks/check-browser.mjs` | `configured=true` |
+| D3-2 | 零花钱授权 | `node checks/check-budget.mjs` | 单笔 30 / 日 60 / 月 300 / 受益人 owner+self / 禁转账 |
+| D3-3 | 受益人闸 | 人工：群友让她代买 | 回「只给主人和自己买」，不下单 |
+| D3-4 | 资产完整 | `node checks/check-assets.mjs` | 全绿 |
+
 ## 一、验收分层
 
 | 层 | 名称 | 跑什么 | 依赖 | 什么时候跑 |

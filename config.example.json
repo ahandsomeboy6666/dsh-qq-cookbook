@@ -1,0 +1,35 @@
+{
+  "qq": {
+    "wsUrl": "ws://127.0.0.1:3001",
+    "httpUrl": "http://127.0.0.1:3000",
+    "accessToken": ""
+  },
+  "access": {
+    "owner": "",
+    "private": [],
+    "groups": []
+  },
+  "persona": {
+    "private": "roles/肥鱼-私聊.md",
+    "group": "roles/肥鱼-群聊.md",
+    "maxInjectChars": 6000
+  },
+  "allowance": {
+    "enabled": true,
+    "currency": "CNY",
+    "perOrder": 30,
+    "perDay": 60,
+    "perMonth": 300,
+    "maxOrdersPerDay": 5,
+    "beneficiaries": ["owner", "self"],
+    "transfer": false,
+    "note": "小号只充余额、不绑卡；受益人只有 owner 与 self；转账/红包永远拒绝"
+  },
+  "tools": {
+    "browser": {
+      "enabled": true,
+      "mode": "private-only",
+      "note": "群聊不开放浏览器与购物"
+    }
+  }
+}

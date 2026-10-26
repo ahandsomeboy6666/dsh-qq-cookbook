@@ -4,9 +4,11 @@
 
 ## 一、这个仓库是什么
 
-把 **DeepSeek Harness（DSH）接入 QQ** 的配方书与验收资产：路线对比、技术选型、安全边界、体验规格、分阶段任务卡，以及能真跑的检查脚本。
+把 **DeepSeek Harness（DSH）接入 QQ** 的选型与部署资产：路线对比、体验评分、安全边界、部署任务卡，以及能真跑的检查脚本。
 
 **唯一标准：在 QQ 里用起来像个人。** 功能实现但 UX 指标不达标，不算做完（见 [docs/07-ux-spec.md](docs/07-ux-spec.md)）。
+
+**当前方案（已拍板）**：`cheems135/dsh-qq-bridge` 插件 + NapCat，主线是**部署与验收**，不是自己写桥接。见 [docs/10-current-plan.md](docs/10-current-plan.md)。
 
 ```
 QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH（Web / ACP / SDK）
@@ -14,7 +16,7 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
    └────────── 回复 / 提问 / 审批 ◄──────┴────────────────┘
 ```
 
-**这个仓库当前不含可运行的桥接代码。** 本阶段交付的是「可开发、可验收」的决策与任务资产；代码按 [docs/05-roadmap.md](docs/05-roadmap.md) 的里程碑，从 [tasks/02-minimal-loop.md](tasks/02-minimal-loop.md) 开始逐步长出来。
+**当前不自己写桥接**：用 [cheems135/dsh-qq-bridge](https://github.com/cheems135/dsh-qq-bridge) 插件 + NapCat。自建路线（`tasks/01-09`）已归档，只作参考；主线是 `tasks/10-13` 的部署与验收。
 
 **它不是** [qq-bridge](../qq-bridge/) 的 fork 或续作。qq-bridge 是上一轮 agent 给出的参考实现，本仓库把它当**已验证的事实基线**引用（见 [docs/references/qq-bridge-baseline.md](docs/references/qq-bridge-baseline.md)），不复制其 10,400 行单文件结构。
 
@@ -27,6 +29,7 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 | [docs/01-tech-selection.md](docs/01-tech-selection.md) | 技术选型：五条接入通道对比与推荐 |
 | [docs/03-threat-model.md](docs/03-threat-model.md) | 安全边界：QQ 消息是不可信输入 |
 | [docs/07-ux-spec.md](docs/07-ux-spec.md) | 体验标准：场景、U1–U10 指标、失败文案 |
+| [docs/10-current-plan.md](docs/10-current-plan.md) | **当前方案一页纸**：cheems + NapCat + 30 元授权 |
 | [docs/04-acceptance.md](docs/04-acceptance.md) | 验收矩阵：每个里程碑跑什么命令 |
 | [tasks/README.md](tasks/README.md) | 任务卡索引与依赖关系 |
 
