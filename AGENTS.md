@@ -18,7 +18,7 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 
 **当前不自己写桥接**：用 [cheems135/dsh-qq-bridge](https://github.com/cheems135/dsh-qq-bridge) 插件 + NapCat。自建路线（`tasks/01-09`）已归档，只作参考；主线是 `tasks/10-13` 的部署与验收。
 
-**它不是** [qq-bridge](../qq-bridge/) 的 fork 或续作。qq-bridge 是上一轮 agent 给出的参考实现，本仓库把它当**已验证的事实基线**引用（见 [docs/references/qq-bridge-baseline.md](docs/references/qq-bridge-baseline.md)），不复制其 10,400 行单文件结构。
+**它不是** [qq-bridge](https://github.com/Derpyu520/qq-bridge) 的 fork 或续作。qq-bridge 是上一轮 agent 给出的参考实现，本仓库把它当**已验证的事实基线**引用（见 [docs/references/qq-bridge-baseline.md](docs/references/qq-bridge-baseline.md)），不复制其 10,400 行单文件结构。
 
 ## 二、开工前必读
 

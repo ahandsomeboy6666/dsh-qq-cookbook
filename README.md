@@ -6,7 +6,7 @@
 
 > **当前方案（已拍板）**：`cheems135/dsh-qq-bridge` 插件 + NapCat 小号。本仓库负责**选型、配置、验收**，不自己写桥接。见 [当前方案](docs/10-current-plan.md)。
 >
-> 与 [qq-bridge](../qq-bridge/) 无代码关系，只引用其已验证结论作为事实基线。
+> 与 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 无代码关系，只引用其已验证结论作为事实基线。
 
 ## 一分钟选型
 
