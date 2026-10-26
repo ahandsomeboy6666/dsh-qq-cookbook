@@ -4,7 +4,9 @@
 
 ## 一、这个仓库是什么
 
-把 **DeepSeek Harness（DSH）接入 QQ** 的配方书与验收资产：路线对比、技术选型、安全边界、分阶段任务卡，以及能真跑的检查脚本。
+把 **DeepSeek Harness（DSH）接入 QQ** 的配方书与验收资产：路线对比、技术选型、安全边界、体验规格、分阶段任务卡，以及能真跑的检查脚本。
+
+**唯一标准：在 QQ 里用起来像个人。** 功能实现但 UX 指标不达标，不算做完（见 [docs/07-ux-spec.md](docs/07-ux-spec.md)）。
 
 ```
 QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH（Web / ACP / SDK）
@@ -24,6 +26,7 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 | [docs/00-proposal.md](docs/00-proposal.md) | 提案：目标、非目标、成功标准、待确认决策 |
 | [docs/01-tech-selection.md](docs/01-tech-selection.md) | 技术选型：五条接入通道对比与推荐 |
 | [docs/03-threat-model.md](docs/03-threat-model.md) | 安全边界：QQ 消息是不可信输入 |
+| [docs/07-ux-spec.md](docs/07-ux-spec.md) | 体验标准：场景、U1–U10 指标、失败文案 |
 | [docs/04-acceptance.md](docs/04-acceptance.md) | 验收矩阵：每个里程碑跑什么命令 |
 | [tasks/README.md](tasks/README.md) | 任务卡索引与依赖关系 |
 
@@ -82,6 +85,7 @@ node checks/check-assets.mjs     # 缺文档/缺验收 → 红
 | `docs/decisions/ADR-*.md` | 单个决策的取舍与风险 | 全局背景（链接提案） |
 | `docs/02-architecture.md` | 组件、数据流、失败模式 | 选型理由（链接 ADR） |
 | `docs/03-threat-model.md` | 信任边界与对策 | 实现代码 |
+| `docs/07-ux-spec.md` | 体验目标、场景、U1–U10 指标、失败文案 | 实现细节 |
 | `docs/04-acceptance.md` | 每个里程碑的验收命令与期望 | 产品目标 |
 | `docs/05-roadmap.md` | 里程碑顺序、依赖、任务卡索引 | 重复验收细节（链接 acceptance） |
 | `docs/06-methodology.md` | 可复用的开发范式 | 本项目的具体选型 |

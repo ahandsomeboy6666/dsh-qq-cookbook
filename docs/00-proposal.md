@@ -26,12 +26,19 @@ DSH 是本地优先的 coding agent，入口是 Web GUI / 桌面端。QQ 是国�
 
 ## 三、目标（可验收）
 
+**唯一标准：在 QQ 里用起来像个人。** 具体拆成七条：
+
 | # | 目标 | 验收方式 |
 |---|---|---|
-| G1 | 新机器 30 分钟内跑通最小回环（QQ → DSH → QQ） | [M0 验收](04-acceptance.md#m0)：`node checks/probe-dsh.mjs --json` 输出版本与 profile；端到端脚本断言收到回复 |
-| G2 | QQ 侧不可信输入无法触达本地工具 | preset 工具清单断言脚本：白名单之外的工具数为 0；发送目标越界被拒的单元测试 |
-| G3 | DSH 小版本升级后 30 分钟内定位断点 | `node checks/probe-dsh.mjs --json` 与 `npm run verify:adaptation` 的输出对比；失败点落在单一适配层文件 |
-| G4 | 换人格不改代码 | `roles/*.md` 改动后下一条消息生效，无需重启桥接；注入长度有上限断言 |
+| G1 | 新机器 15 分钟内收到第一条回复 | 向导 + 探针 + 人工计时（[UX U8](07-ux-spec.md#三指标可验收)） |
+| G2 | 短问答 P50 ≤3s、P95 ≤8s；长任务首个反馈 ≤2s | `npm run test:ux-latency`、`test:ux-latency -- task` |
+| G3 | 等待可打断、可补充 | `npm run test:ux-interrupt`、`test:steer` |
+| G4 | 私聊不沉默、群聊不刷屏 | `npm run test:ux-quiet`、`test:group-reply` |
+| G5 | 发图能懂；语音有诚实提示 | `npm run test:vision`、`test:voice` |
+| G6 | 失败 5s 内人话 + 可重试 | `npm run test:ux-failure` |
+| G7 | 换人格、改白名单不重启 | `npm run test:persona-hot`、`test:guid` |
+
+细节与场景见 [UX 规格](07-ux-spec.md)。
 
 ## 四、非目标
 
@@ -39,18 +46,21 @@ DSH 是本地优先的 coding agent，入口是 Web GUI / 桌面端。QQ 是国�
 - **不做 QQ 协议逆向**：只消费 OneBot v11 标准事件，不碰客户端注入。
 - **不做多租户 / 多账号 SaaS**：单机、单账号、个人使用优先。
 - **不做插件市场 / 通用 bot 平台**：不与 AstrBot 竞争，只在「DSH 是大脑」这件事上做到最好。
-- **不承诺语音/视频/表情全支持**：M3 再评估，先保证文本回环与安全。
-- **不承诺兼容 DSH 所有历史版本**：只保证当前实测版本 + 一个次版本的回退路径。
+- **不承诺语音/视频/表情全支持**：图片 M1、语音与表情 M2，视频不做。
+- **不做逐字流式**：QQ 消息不能编辑，逐字等于刷屏（[ADR-007](decisions/ADR-007-streaming.md)）。
+- **不做假「正在输入」状态**：OneBot 无此能力，不假装。
+- **不为节省 token 牺牲首条延迟**：默认 flash，复杂任务自动升 pro；成本可见但不作为路由限制。这是「只考虑体验」的直接含义。
 
 ## 五、成功标准
 
 M0 完成时同时满足：
 
 1. `node checks/check-assets.mjs` 全绿。
-2. `node checks/probe-dsh.mjs --json` 能报出 `dshVersion`、`profiles`、`onebotReachable`，退出码 0。
+2. `node checks/probe-dsh.mjs --json` 能报出 `dshVersion`、`profiles`、`OneBot` 可达性，退出码 0。
 3. QQ 私聊发「ping」，30 秒内收到 agent 回复；对应 DSH 会话里能看到这条用户消息。
 4. 白名单外的 QQ 号发消息，桥接日志记录「已忽略」且不建会话。
-5. 以上四条写成 [04-acceptance.md](04-acceptance.md) 的 M0 验收表，可重复执行。
+
+M3/M4 完成时追加 UX 指标（[UX 规格第三节](07-ux-spec.md#三指标可验收)）：首条延迟、分条、打断、群聊静默、失败文案、发图理解。**指标不达标不算做完**，不允许用「功能已实现」替代。
 
 ## 六、关键假设（待验证）
 
@@ -68,7 +78,9 @@ M0 完成时同时满足：
 | DSH 协议再次变更导致静默失效 | 高 | 高 | 适配层单点 + 探针 + 版本台账；升级先跑验收矩阵 |
 | QQ 账号被风控/封禁 | 中 | 高 | 只用小号；控制发送频率；不在群里刷屏；协议端只做正常消息 |
 | prompt injection 诱导越权 | 高 | 高 | preset 不挂本地工具；发送白名单双重校验；敏感信息审计 |
-| token 成本随群聊增长 | 中 | 中 | 上下文压缩、人格注入上限、按会话记账与限额 |
+| token 成本随群聊增长 | 中 | 中 | 上下文压缩、人格注入上限、按会话记账与告警；**不通过降级模型省钱** |
+| 分条过快触发限流 | 中 | 中 | 段间隔 400–900ms、群内冷却、每轮最多 4 条 |
+| 向导写入 `~/.dsh` 权限过大 | 中 | 中 | 每步展示将写什么、先备份、失败可回滚 |
 | 协议端 EULA / 合规风险 | 中 | 中 | 只做本地个人使用；不打包分发协议端；文档明示风险 |
 
 ## 八、待确认决策
@@ -83,5 +95,10 @@ M0 完成时同时满足：
 | D4 | 会话映射 | 1 QQ 会话 = 1 DSH 会话，持久化 | 每条消息新会话（丢弃上下文） |
 | D5 | 人格分层 | preset 管行为 + roles 管人设 | 单层 prompt |
 | D6 | 安全模型 | fail-closed 白名单 + preset 裁剪 | 事后审计 |
-| D7 | 本轮范围 | 仅文档 + 检查脚本，代码下一轮 | 文档 + 最小可跑代码 |
+| D7 | 实现节奏 | 按任务卡逐个里程碑，先红后绿 | 一次性大改 |
 | D8 | 许可证与语言 | MIT，中文为主 + 英文 README 后补 | 其他 |
+| D9 | 回复节奏 | 首条早发 + 长回复分条（[ADR-007](decisions/ADR-007-streaming.md)） | 整轮一次性发 |
+| D10 | 打断 | 意图分类：cancel / steer / 排队（[ADR-008](decisions/ADR-008-interrupt.md)） | 全部排队 |
+| D11 | 模型路由 | flash 默认、复杂任务升 pro、图片 M1（[ADR-009](decisions/ADR-009-model-routing.md)） | 固定 pro |
+| D12 | 群聊 | 只在触发时参与，短、分条、引用、冷却（[ADR-010](decisions/ADR-010-group-chat.md)） | 每条都回 |
+| D13 | 部署 | 一键向导 + 控制台 + 统一失败文案（[ADR-011](decisions/ADR-011-onboarding.md)） | 手改 12 处配置 |

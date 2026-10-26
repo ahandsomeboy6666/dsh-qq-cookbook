@@ -17,13 +17,14 @@
 | [docs/01-tech-selection.md](01-tech-selection.md) | 五条 DSH 接入通道、四类 QQ 协议端、推荐堆栈 | 草案 |
 | [docs/02-architecture.md](02-architecture.md) | 组件、入站/出站数据流、会话映射、失败模式 | 草案 |
 | [docs/03-threat-model.md](03-threat-model.md) | 信任边界、攻击面、六条红线与对策 | 草案 |
+| [docs/07-ux-spec.md](07-ux-spec.md) | 体验目标、11 个场景、U1–U10 指标、文案与群聊礼仪 | 草案 |
 
 ## 执行
 
 | 文件 | 一句话 | 状态 |
 |---|---|---|
 | [docs/04-acceptance.md](04-acceptance.md) | 每个里程碑的验收命令、期望输出、红灯示例 | 草案 |
-| [docs/05-roadmap.md](05-roadmap.md) | M0–M3 里程碑、依赖图、任务卡索引 | 草案 |
+| [docs/05-roadmap.md](05-roadmap.md) | M0–M4 里程碑、依赖图、任务卡索引 | 草案 |
 | [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 草案 |
 
 ## 决策记录（ADR）
@@ -37,6 +38,11 @@
 | [docs/decisions/ADR-004-session-mapping.md](decisions/ADR-004-session-mapping.md) | 1 个 QQ 会话 = 1 个 DSH 会话，映射持久化 | 待确认 |
 | [docs/decisions/ADR-005-persona-layers.md](decisions/ADR-005-persona-layers.md) | 人格两层：preset 管行为，roles 管人设 | 待确认 |
 | [docs/decisions/ADR-006-security.md](decisions/ADR-006-security.md) | fail-closed 白名单 + preset 工具裁剪 + 发送审计 | 待确认 |
+| [docs/decisions/ADR-007-streaming.md](decisions/ADR-007-streaming.md) | 首条早发 + 长回复分条 + 进度占位 | 待确认 |
+| [docs/decisions/ADR-008-interrupt.md](decisions/ADR-008-interrupt.md) | 忙时三路：cancel / steer / 排队 | 待确认 |
+| [docs/decisions/ADR-009-model-routing.md](decisions/ADR-009-model-routing.md) | flash 默认、复杂任务升 pro、图片 M1 | 待确认 |
+| [docs/decisions/ADR-010-group-chat.md](decisions/ADR-010-group-chat.md) | 群聊只在触发时参与，短、分条、引用、冷却 | 待确认 |
+| [docs/decisions/ADR-011-onboarding.md](decisions/ADR-011-onboarding.md) | 一键向导 + 控制台 + 统一失败文案 | 待确认 |
 
 ## 外部事实基线
 
