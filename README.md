@@ -37,8 +37,9 @@ node checks/check-persona.mjs
 node checks/check-browser.mjs
 node checks/check-budget.mjs
 
-# 随时：资产完整性
+# 随时：资产完整性 + 事实一致性
 node checks/check-assets.mjs
+node checks/check-consistency.mjs
 ```
 
 前置条件、失败排查、每步期望输出见 [验收矩阵](docs/04-acceptance.md)。任务卡见 [tasks/README.md](tasks/README.md)。
@@ -51,7 +52,7 @@ docs/decisions/  ADR（每个技术决策一篇，含风险与验证方式）
 docs/references/ 外部事实基线（版本、出处、体验评分）
 docs/templates/  可复制到其他项目的模板
 tasks/           任务卡：D0–D3 部署（主线）+ 01–09 自建（已归档）
-checks/          检查脚本（资产、DSH、OneBot、安装、人设、额度、浏览器）
+checks/          检查脚本（资产、一致性、DSH、OneBot、安装、人设、额度、浏览器）
 ```
 
 文档索引：[docs/README.md](docs/README.md)。
@@ -92,7 +93,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 当前方案（一页纸） | ✅ 已拍板 |
 | 安全与零花钱授权模型 | ✅ 已定 |
 | 部署任务卡 D0–D3 | ✅ 已写，待执行 |
-| 检查脚本（7 个） | ✅ 可运行 |
+| 检查脚本（8 个） | ✅ 可运行 |
 | 环境（NapCat / cheems / 人设） | ⏳ 未就绪 |
 
 ## 状态

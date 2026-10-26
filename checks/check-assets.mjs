@@ -256,6 +256,17 @@ try {
   check('AGENTS.md 必读表路径存在', false, String(err.message))
 }
 
+// ---------------------------------------------------------------- 9. README 脚本数量
+try {
+  const { readdir } = await import('node:fs/promises')
+  const scripts = (await readdir(join(ROOT, 'checks'))).filter(f => f.endsWith('.mjs'))
+  const readme = await read('README.md')
+  const declared = Number(readme.match(/检查脚本（(\d+) 个）/)?.[1] ?? NaN)
+  check('README 检查脚本数量', declared === scripts.length, `README 写 ${Number.isNaN(declared) ? '未写' : declared}，实际 ${scripts.length}`)
+} catch (err) {
+  check('README 检查脚本数量', false, String(err.message))
+}
+
 // ---------------------------------------------------------------- 输出
 const passed = results.filter(r => r.ok).length
 const failed = results.length - passed
