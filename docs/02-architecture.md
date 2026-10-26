@@ -1,6 +1,8 @@
 # 架构
 
-> 本文只描述**组件、数据流、失败模式**。为什么这么选见 [技术选型](01-tech-selection.md) 与 [ADR](decisions/README.md)，验收命令见 [验收矩阵](04-acceptance.md)。
+> ⚠️ **本文是自建桥接路线的架构（已归档）**。当前方案是 cheems 插件 + NapCat，见 [当前方案](10-current-plan.md)。
+>
+> 只有 cheems 走不通、需要自建时，才按本文实现。
 
 ## 一、组件
 

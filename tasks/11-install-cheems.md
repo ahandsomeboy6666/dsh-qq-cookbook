@@ -13,7 +13,7 @@ cheems 插件加载，QQ 私聊发消息能收到回复。
 
 ## 输出
 
-- profile 注册：`dsh plugin --profile web add <cheems 路径>`
+- profile 注册：`dsh plugin --profile desktop add <cheems 路径>`（桌面端用 `desktop`，不是 `web`）
 - 设置页出现「QQ 桥接」
 - `config.json` 填好 `qq.wsUrl` / `accessToken` / 白名单
 

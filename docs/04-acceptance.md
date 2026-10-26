@@ -43,12 +43,12 @@ L0–L2 必须全绿才能说「做完了」；L3–L5 用真实账号，失败�
 node checks/check-assets.mjs          # L0：文档资产是否齐、验收是否可执行
 node checks/probe-dsh.mjs --json      # L1：DSH 版本/profile/鉴权/端口
 npm test                              # L2：单元测试（node:test）
-npm run verify:adaptation             # L1：DSH 协议适配断言（M0 后新增）
-npm run test:e2e                      # L3：真实回环
-npm run test:ux-latency               # L4：首条延迟
+npm run verify:adaptation             # L1：DSH 协议适配断言（自建路线，已归档）
+npm run test:e2e                      # L3：真实回环（自建路线，已归档）
+npm run test:ux-latency               # L4：首条延迟（自建路线，已归档）
 ```
 
-## 三、M0：最小回环
+## 三、M0：最小回环（自建路线，已归档）
 
 目标：QQ 私聊发「ping」→ 30 秒内收到 agent 回复。
 
@@ -65,7 +65,7 @@ npm run test:ux-latency               # L4：首条延迟
 
 **红灯示例（M0-2）**：如果 `probe-dsh` 输出 `profiles: ["web","desktop"]` 但 `webApi.reachable=false`，说明 DSH 没启动或端口不对——先解决这个，不要继续写桥接。
 
-## 四、M1：安全与稳定
+## 四、M1：安全与稳定（自建路线，已归档）
 
 目标：攻击演练全过、断线能自愈。
 
@@ -79,7 +79,7 @@ npm run test:ux-latency               # L4：首条延迟
 | M1-6 | 断线重连 | `npm run test:reconnect` | 断开 30s 后恢复，事件继续处理，进程不退出 |
 | M1-7 | 单实例 | `npm start` 两次 | 第二次退出码非 0，输出「已有实例」 |
 
-## 五、M2：会话与人格
+## 五、M2：会话与人格（自建路线，已归档）
 
 目标：重启不串台，换人格不改代码。
 
@@ -92,7 +92,7 @@ npm run test:ux-latency               # L4：首条延迟
 | M2-5 | 换人格热生效 | `npm run test:persona-hot` | 改卡后下一条回复带新名，无需重启 |
 | M2-6 | 审批超时 | `npm test -- interaction` | 120s 后 agent 收到「拒绝」 |
 
-## 六、M3：体验核心
+## 六、M3：体验核心（自建路线，已归档）
 
 目标：回复快、能分条、能打断、群聊不刷屏。
 
@@ -108,7 +108,7 @@ npm run test:ux-latency               # L4：首条延迟
 | M3-8 | 模型路由 | `npm run test:model-route` | 短文本 flash、堆栈 pro、带图 flash |
 | M3-9 | 失败文案 | `npm run test:ux-failure` | 5 类故障 5s 内给出对应人话 |
 
-## 七、M4：多模态与打磨
+## 七、M4：多模态与打磨（自建路线，已归档）
 
 目标：发图能懂、部署 15 分钟、控制台可用。
 

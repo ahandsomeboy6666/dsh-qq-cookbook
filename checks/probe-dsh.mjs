@@ -167,7 +167,7 @@ if (!out.webApi.reachable) {
 if (!out.onebot.reachable) {
   out.warnings.push(`OneBot HTTP 不可达（${out.onebot.url}）：协议端没启动，或端口/token 不对`)
 }
-out.ok = Boolean(out.dsh) && out.profiles.list.includes('web')
+out.ok = Boolean(out.dsh) && (out.profiles.list.includes('web') || out.profiles.list.includes('desktop'))
 
 if (JSON_MODE) {
   console.log(JSON.stringify(out, null, 2))

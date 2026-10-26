@@ -59,22 +59,23 @@ DSH 是本地优先的 coding agent，入口是 Web GUI / 桌面端。QQ 是国�
 
 ## 五、成功标准
 
-M0 完成时同时满足：
+D0–D3 完成时同时满足：
 
 1. `node checks/check-assets.mjs` 全绿。
-2. `node checks/probe-dsh.mjs --json` 能报出 `dshVersion`、`profiles`、`OneBot` 可达性，退出码 0。
-3. QQ 私聊发「ping」，30 秒内收到 agent 回复；对应 DSH 会话里能看到这条用户消息。
-4. 白名单外的 QQ 号发消息，桥接日志记录「已忽略」且不建会话。
+2. `node checks/probe-dsh.mjs --json` 能报出 `desktop`、`profiles`、`onebot` 可达性。
+3. QQ 私聊发「ping」，30 秒内收到回复；群聊 @ 也能回。
+4. 两套人设生效，语气可辨。
+5. 浏览器能打开 B 站；30 元授权三道闸通过。
 
-M3/M4 完成时追加 UX 指标（[UX 规格第三节](07-ux-spec.md#三指标可验收)）：首条延迟、分条、打断、群聊静默、失败文案、发图理解。**指标不达标不算做完**，不允许用「功能已实现」替代。
+UX 指标（[UX 规格第三节](07-ux-spec.md#三指标可验收)）作为验收参考：首条延迟、分条、打断、群聊静默、失败文案。**指标不达标不算做完**。
 
 ## 六、关键假设（待验证）
 
 | # | 假设 | 验证方式 | 失败后果 |
 |---|---|---|---|
-| A1 | cheems 插件与 NapCat 在本机 `0.2.0-rc.2` 上可加载、可收发 | [tasks/10-onboard-env.md](../tasks/10-onboard-env.md)、[11](../tasks/11-install-cheems.md) | 需要换官方 Bot 路线或自建 |
-| A2 | NapCat 的 OneBot v11 事件形状与 SnowLuma 足够一致，桥接不需要为协议端写两套 | [tasks/03-qq-channel.md](../tasks/03-qq-channel.md) | 需要协议端适配层，工作量 +2 人日 |
-| A3 | `ask_user_question` 与工具审批可以稳定转发到 QQ 并回填 | M1 验收脚本 | 交互断链，agent 长任务会卡住 |
+| A1 | cheems 插件与 NapCat 在桌面端 `0.2.1-rc.3` 上可加载、可收发 | [tasks/10-onboard-env.md](../tasks/10-onboard-env.md)、[11](../tasks/11-install-cheems.md) | 需要换官方 Bot 路线或回退桌面端 |
+| A2 | cheems 的 `/cancel`、分条、人设能覆盖当前体验需求 | [tasks/12-persona.md](../tasks/12-persona.md) | 需要补丁或换插件 |
+| A3 | 提问/审批可在 QQ 侧往返（cheems 文字应答） | [tasks/11-install-cheems.md](../tasks/11-install-cheems.md) | 长任务可能卡住，改用官方 Bot 按钮 |
 | A4 | 单条 QQ 消息 + 历史注入不超过模型上下文，长群聊需要压缩 | token 记账脚本 | 成本失控 |
 
 ## 七、风险

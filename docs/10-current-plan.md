@@ -77,7 +77,7 @@ DSH agent（人格卡 + 工具）
 |---|---|---|
 | V1 | 本机 DSH 是否挂了 Playwright MCP | `node checks/probe-dsh.mjs --json` + 看 `~/.dsh` 的 MCP 配置 |
 | V2 | NapCat 能否扫码登录、开 WS | 装 NapCat，`node checks/probe-onebot.mjs` |
-| V3 | cheems 插件在桌面端 `0.2.1-rc.3` 上能加载 | `dsh plugin --profile web add <cheems>` + 重启 + 设置页出现「QQ 桥接」 |
+| V3 | cheems 插件在桌面端 `0.2.1-rc.3` 上能加载 | `dsh plugin --profile desktop add <cheems>` + 重启 + 设置页出现「QQ 桥接」 |
 | V4 | 美团/饿了么网页版能到订单确认页 | 手动跑一次 Playwright |
 
 > ⚠️ 版本提示：桌面端已从 `0.2.0-rc.2` 升到 `0.2.1-rc.3`（2026-10-26）。cheems 的 README 未声明适配版本，D1 加载失败时先看 DSH 日志里的插件 API 报错；备选是官方 Bot 插件（腾讯/xcis）或等 cheems 更新。
