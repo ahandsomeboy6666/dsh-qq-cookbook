@@ -8,8 +8,9 @@
 
 | 事实 | 命令 | 输出 |
 |---|---|---|
-| DSH 版本 | `dsh --version` | `0.2.0-rc.2` |
-| Node 版本 | `node --version` | `v22.22.0` |
+| DSH 版本（CLI） | `dsh --version` | `0.2.0-rc.2` |
+| DSH 版本（桌面端） | 读 `runtime.json` | `0.2.1-rc.3`（内置 Node 24.21，2026-10-26 升级） |
+| Node 版本（系统） | `node --version` | `v22.22.0` |
 | 可用 profile | `ls ~/.dsh/profiles` | `web`、`desktop`（**没有** `acp`/`sdk`/`headless`） |
 | DSH 家目录 | `ls ~/.dsh` | 含 `.credentials.yaml`、`profiles/`、`sessions/`、`skills/` 等 |
 | CLI 能力 | `dsh --help` | `dsh [--profile] <name>`；`--dump-config`；`dsh headless "task"` 为示例 |

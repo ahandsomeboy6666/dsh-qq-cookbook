@@ -73,6 +73,22 @@ async function dshVersionFromCli() {
   }
 }
 
+/** 桌面端版本：读内置 runtime 的 runtime.json（desktopVersion），不依赖 PATH 里的 dsh */
+async function desktopVersion() {
+  const dirs = [
+    process.env.DSH_DESKTOP_DIR,
+    'E:\\dsh桌面端',
+    join(process.env.LOCALAPPDATA ?? '', 'Programs', 'DeepSeek Harness'),
+    join(process.env.ProgramFiles ?? '', 'DeepSeek Harness')
+  ].filter(Boolean)
+  for (const dir of dirs) {
+    const p = join(dir, 'resources', 'runtime', 'primary-runtime', 'runtime.json')
+    const rt = await readJson(p)
+    if (rt?.desktopVersion) return { version: rt.desktopVersion, runtimeNode: rt.node ?? null, source: p }
+  }
+  return null
+}
+
 async function profiles() {
   const dir = join(DSH_HOME, 'profiles')
   const s = await safeStat(dir)
@@ -121,6 +137,7 @@ const out = {
   generatedAt: new Date().toISOString(),
   node: { version: process.version, platform: process.platform },
   dsh: null,
+  desktop: await desktopVersion(),
   profiles: await profiles(),
   dshHome: {
     path: DSH_HOME,
@@ -159,6 +176,7 @@ if (JSON_MODE) {
   console.log('\nDSH 环境探针\n')
   line('node', out.node.version)
   line('dsh', out.dsh ? `${out.dsh.version}  (${out.dsh.source})` : '未探测到')
+  line('desktop', out.desktop ? `${out.desktop.version}  (内置 Node ${out.desktop.runtimeNode})` : '未探测到')
   line('profiles', out.profiles.exists ? out.profiles.list.join(', ') : '目录不存在')
   line('DSH_HOME', out.dshHome.path)
   line('.credentials.yaml', out.auth.exists ? `存在（browser-session 键=${out.auth.hasBrowserSessionKey}）` : '不存在')

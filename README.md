@@ -56,10 +56,14 @@ checks/          检查脚本（资产检查、环境探针）
 
 | 组件 | 版本 | 来源 |
 |---|---|---|
-| 本机 DSH | `0.2.0-rc.2` | 实测 `dsh --version`（2026-10-26） |
+| 本机桌面端 | `0.2.1-rc.3`（内置 Node 24.21） | `resources/runtime/primary-runtime/runtime.json`（2026-10-26 升级） |
+| 全局 CLI | `0.2.0-rc.2` | 实测 `dsh --version` |
+| 系统 Node | `22.22.0` | 实测 `node --version` |
 | DSH 源码（工作区内） | `0.1.7-rc.2` | `deepseek-harness/package.json` |
 | 本机 profile | `web` / `desktop` | `~/.dsh/profiles` |
 | 参考实现 | qq-bridge `v0.2.1-r1` | 其 README 声明适配 `0.2.1-rc.2` |
+
+> 桌面端与 CLI 版本可能不一致：桌面端走内置 runtime，CLI 走全局 npm 包。cheems 是插件，跟随**桌面端**版本，验证时以 `desktop` 字段为准。
 
 **版本是结论的一部分。** 任何「DSH 支持 X」的说法都必须带上版本，见 [AGENTS.md](AGENTS.md) 第三节。
 

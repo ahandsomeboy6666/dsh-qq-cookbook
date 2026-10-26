@@ -133,6 +133,8 @@ node checks/check-assets.mjs     # 缺文档/缺验收 → 红
 ## 九、环境与部署
 
 - 本仓库只在工作区内（`C:\Users\麾\Desktop\qinyaohui1\dsh-qq-cookbook`）。
-- 本机 DSH：`dsh 0.2.0-rc.2`（`dsh --version`），profile 目录 `~/.dsh/profiles` 当前只有 `web` / `desktop`。
+- 本机桌面端：`0.2.1-rc.3`（内置 Node 24.21）；全局 CLI：`0.2.0-rc.2`（`dsh --version`）。两者可能不一致，插件跟随桌面端。
+- profile 目录 `~/.dsh/profiles` 当前只有 `web` / `desktop`。
+- 桌面端 Web 端口每次随机（本次 `53800`），探针用 `--dsh-url` 指定。
 - 已有在跑的服务：AstrBot 6185、OneBot 反向 WS 6199、NapCat 6099（见工作区根 `AGENTS.md`）。
 - 写 `D:\qqaibot` 或启动/停止现有服务前先问用户，不要自行操作。
