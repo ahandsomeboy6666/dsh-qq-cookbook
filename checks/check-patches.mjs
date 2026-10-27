@@ -36,6 +36,7 @@ const PATCHES = [
   ['P7 情境判断宽容解析', 'const block=String(text).match'],
   ['P8 @别人时不插嘴', '在跟别人说话，不接'],
   ['P9 昵称只在像叫她时算', '像在叫她'],
+  ['P10 群聊放行只读联网', 'group allowed read-only web tool'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 
