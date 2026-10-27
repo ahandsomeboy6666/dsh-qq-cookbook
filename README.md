@@ -1,4 +1,4 @@
-﻿# dsh-qq-cookbook
+# dsh-qq-cookbook
 
 把 **DeepSeek Harness（DSH）接入 QQ** 的选型与部署资产：选哪条路、怎么验收、哪些坑已经有人踩过。
 
@@ -24,13 +24,14 @@
 ```powershell
 git clone https://github.com/ahandsomeboy6666/dsh-qq-cookbook.git
 cd dsh-qq-cookbook
-node tools/setup.mjs
+node tools/setup.mjs      # 会问你 QQ 号 / 群号
 ```
 
-自动完成：clone 插件并打补丁 → 注册到 desktop profile → 写 `cordis.patch.yml` → 写两套人设 → 装 Playwright MCP → 补 NapCat 启动器。
-之后只剩三件人工：**启动 NapCat 扫码、重启 DSH、小号只充 30 元**。
+自动完成：检测 DSH（缺则下载安装包）→ NapCat（缺则下 OneKey，`--install-napcat` 可自动装）→ clone 插件并打补丁 → 注册到 profile → 写 `cordis.patch.yml` → 写两套人设并**绑定会话** → 装 Playwright MCP → 装语音依赖。
 
-细节与边界见 [一个命令恢复](docs/16-one-command.md)。
+之后只剩人工：**装 DSH 并登录、NapCat 扫码、小号只充 30 元**。
+
+细节与陌生人实测见 [一个命令恢复](docs/16-one-command.md)。
 
 ## 一键启动（日常）
 
