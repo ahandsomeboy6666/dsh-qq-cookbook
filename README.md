@@ -45,6 +45,9 @@ dsh plugin --profile desktop add <cheems 仓库路径>
 # D2 人设（私聊/群聊两套）
 node checks/check-persona.mjs
 
+# 本地补丁（插件是 fork，升级后确认改动还在）
+node checks/check-patches.mjs
+
 # D3 能力与零花钱
 node checks/check-browser.mjs
 node checks/check-budget.mjs
@@ -62,12 +65,12 @@ node cli.mjs status
 ## 目录
 
 ```
-docs/            提案、选型、架构、安全、UX 规格、验收、路线、方法论
+docs/            提案、选型、架构、安全、UX 规格、验收、路线、方法论、本地补丁
 docs/decisions/  ADR（每个技术决策一篇，含风险与验证方式）
 docs/references/ 外部事实基线（版本、出处、体验评分）
 docs/templates/  可复制到其他项目的模板
 tasks/           任务卡：D0–D3 部署（主线）+ 01–09 自建（已归档）
-checks/          检查脚本（资产、一致性、DSH、OneBot、安装、人设、额度、浏览器）
+checks/          检查脚本（资产、一致性、DSH、OneBot、安装、人设、补丁、额度、浏览器）
 ```
 
 文档索引：[docs/README.md](docs/README.md)。
@@ -107,15 +110,16 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 生态调研（6 个实现、两条路线） | ✅ 已完成 |
 | 当前方案（一页纸） | ✅ 已拍板 |
 | 安全与零花钱授权模型 | ✅ 已定 |
-| 部署任务卡 D0–D3 | ✅ 已写，待执行 |
-| 检查脚本（8 个） | ✅ 可运行 |
-| 环境（NapCat / cheems / 人设） | ⏳ 未就绪 |
+| 部署任务卡 D0–D3 | ✅ 已写 |
+| 检查脚本（9 个） | ✅ 可运行 |
+| 环境（NapCat / cheems / 人设） | ✅ 已就绪（2026-10-27） |
+| 本地补丁（群聊唤醒层等） | ✅ 已生效，见 [补丁清单](docs/12-bridge-patches.md) |
 
 ## 状态
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| D0 | 环境就绪：NapCat 扫码、DSH 版本、插件未装清单 | 📋 待做 |
-| D1 | 装 cheems，私聊/群聊打通 | 📋 待做 |
-| D2 | 私聊/群聊两套人设 | 📋 待做 |
-| D3 | 浏览器能力 + 30 元零花钱授权 | 📋 待做 |
+| D0 | 环境就绪：NapCat 扫码、DSH 版本、插件未装清单 | ✅ 完成（6700/6701，selfId 3866560965） |
+| D1 | 装 cheems，私聊/群聊打通 | ✅ 完成（私聊 + 群聊均通，含空 @） |
+| D2 | 私聊/群聊两套人设 | ✅ 完成（`feiyu` / `feiyu-group`，preset=standard） |
+| D3 | 浏览器能力 + 30 元零花钱授权 | 🟡 部分（额度在示例配置，浏览器未挂） |

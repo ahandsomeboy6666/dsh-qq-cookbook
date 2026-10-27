@@ -20,6 +20,7 @@
     "probe:onebot": "node checks/probe-onebot.mjs",
     "check:install": "node checks/check-install.mjs",
     "check:persona": "node checks/check-persona.mjs",
+    "check:patches": "node checks/check-patches.mjs",
     "check:budget": "node checks/check-budget.mjs",
     "check:browser": "node checks/check-browser.mjs",
     "test": "node cli.mjs check"

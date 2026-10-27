@@ -33,6 +33,7 @@
 | [docs/04-acceptance.md](04-acceptance.md) | 每个里程碑的验收命令、期望输出、红灯示例 | 已定 |
 | [docs/05-roadmap.md](05-roadmap.md) | D0–D3 部署（主线）+ M0–M4 自建（已归档） | 已定 |
 | [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 已定 |
+| [docs/12-bridge-patches.md](12-bridge-patches.md) | **本地补丁清单**：群聊唤醒层等 5 处 fork 改动、重打步骤、验收命令 | 已生效 |
 
 ## 决策记录（ADR）
 

@@ -4,10 +4,27 @@
     "httpUrl": "http://127.0.0.1:6700",
     "accessToken": ""
   },
+  "napcat": {
+    "dir": "E:/workspace/dsh-qq-cookbook/tools/napcat/NapCat.52892.Shell",
+    "launcher": "E:/workspace/dsh-qq-cookbook/tools/napcat/NapCat.52892.Shell/launcher-user.bat",
+    "note": "迁移后插件默认找 ~/NapCat 会失败；launcher-user.bat 走无 UAC 的 cmd 分支"
+  },
   "access": {
-    "owner": "",
-    "private": [],
-    "groups": []
+    "owner": "632207916",
+    "private": ["632207916"],
+    "groups": ["834195405"]
+  },
+  "group": {
+    "replyAt": false,
+    "wake": {
+      "enabled": true,
+      "probability": 0.1,
+      "followMinutes": 5,
+      "bufferSize": 200,
+      "recentLimit": 8,
+      "nicknames": ["肥鱼", "大肥鱼"],
+      "note": "被 @ / 命中昵称必唤醒；其余按概率，没抽中的只进缓冲不调模型"
+    }
   },
   "persona": {
     "private": "roles/肥鱼-私聊.md",
