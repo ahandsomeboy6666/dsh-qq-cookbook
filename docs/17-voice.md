@@ -79,8 +79,38 @@ NapCat 负责转成 QQ 语音消息。
 - 模型判断适合（受 `mediaSharing` 的语音频率限制）
 - 群聊里默认不主动发语音（群友干扰大）
 
-## 六、注意
+## 六、克隆音色（MiniMax）
+
+`voice_id` 必须是**这个 key 所属账号下真实存在的**音色，否则 MiniMax 直接回：
+
+```
+you don't have access to this voice_id
+```
+
+查账号下有哪些音色：
+
+```powershell
+POST https://api.minimax.cn/v1/get_voice
+{"voice_type":"all"}
+# 返回 system_voice（303 个系统音色）+ voice_cloning（你自己的克隆音色）
+```
+
+2026-10-27 实测：本机 key 下 `voice_cloning` 只有 **`c4clone001`**，
+之前配置里写的 `clonezh001` 不存在，所以一直报无权限。改成 `c4clone001` 后试听成功
+（42.6KB mp3，`engine: minimax`，`capability: emotion`）。
+
+常见系统音色（免克隆）：
+
+```
+female-tianmei   甜美女性
+female-shaonv    少女
+female-yujie     御姐
+female-chengshu  成熟女性
+```
+
+## 七、注意
 
 - 语音是**在线合成**，断网就退回 SAPI 或失败；失败会走文字
 - 缓存按文本+音色哈希，同一句不重复合成
 - 音色文件在 `assets/voice-pack/*.mp3`，只用于面板试听
+- MiniMax 每句会先做一次「情境判断」拿语气指令，失败会降级成文字（`lastError` 里有原因）
