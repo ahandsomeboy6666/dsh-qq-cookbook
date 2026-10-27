@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..72c316e 100644
+index 83d8357..8138ffa 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -35,7 +35,7 @@ index 83d8357..72c316e 100644
      cwd: str(config.cwd, process.cwd()),
      agentPreset: str(config.agentPreset, ''),
      model: normalizeModel(config.model),
-@@ -2415,7 +2434,11 @@ export function apply(ctx, rawConfig) {
+@@ -2415,7 +2434,18 @@ export function apply(ctx, rawConfig) {
     */
    function burstSegments(burst, chat) {
      const segments = [];
@@ -45,10 +45,17 @@ index 83d8357..72c316e 100644
 +    if (chat.kind === 'group' && cfg.groupReplyAt !== true) {
 +      burst = burst.replace(/^\s*@[^\s，,：:]{1,20}[ 　]*(?=\S)/, '');
 +    }
++    // 最后一道保险：任何没被识别、没被消费掉的指令标签都不许露给用户。
++    const leftover = burst.match(/\[(?:语音|发送|群发|定时|查)[:：][^\]\n]*\]/g);
++    if (leftover) {
++      log(`stripped unhandled tag(s): ${leftover.join(' ')}`);
++      burst = burst.replace(/\[(?:语音|发送|群发|定时|查)[:：][^\]\n]*\]/g, '').trim();
++      if (burst === '') return [];
++    }
      const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
      let cursor = 0;
      let match;
-@@ -4246,6 +4269,15 @@ export function apply(ctx, rawConfig) {
+@@ -4246,6 +4276,18 @@ export function apply(ctx, rawConfig) {
          // a successful render it degrades to plain text instead of vanishing.
          let voiceFile = null;
          let voiceShare=null;
@@ -59,12 +66,15 @@ index 83d8357..72c316e 100644
 +          const inline = chunk.match(/^([\s\S]*?)\[语音(?:[:：]([^\]\n]{1,20}))?\]\s*([\s\S]*)$/);
 +          if (inline && inline[1].trim() !== '') {
 +            chunk = `[语音${inline[2] ? ':' + inline[2] : ''}] ${inline[1].trim()} ${inline[3]}`.trim();
++            log(`voice tag moved to head (${inline[2] || 'auto'})`);
++          } else if (inline) {
++            log(`voice tag at head (${inline[2] || 'auto'})`);
 +          }
 +        }
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4532,7 +4564,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4574,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -75,7 +85,7 @@ index 83d8357..72c316e 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4683,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4693,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -84,7 +94,7 @@ index 83d8357..72c316e 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4794,35 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4804,35 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -120,7 +130,7 @@ index 83d8357..72c316e 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4858,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4868,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -129,7 +139,7 @@ index 83d8357..72c316e 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4880,45 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4890,45 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -176,7 +186,7 @@ index 83d8357..72c316e 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6009,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6019,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
