@@ -44,11 +44,15 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 | 3 | 检查 desktop profile | 不存在就停：「先启动一次 DSH 再重跑」 |
 | 4 | NapCat | 找 `tools/napcat/*Shell*`；没有就下 OneKey（约 1MB），`--install-napcat` 时再跑官方安装器（约 300MB） |
 | 5 | clone 插件 | `cheems135/dsh-qq-bridge` → `vendor/dsh-im-bridge`，检出基线 `03afb9c` |
-| 6 | 打本地补丁 | `patches/*.patch`，7 处改动 |
+| 6 | 打本地补丁 | `patches/*.patch`，12 处改动（P1–P12） |
 | 7 | 注册到 profile | `package.json` 加 `link:` 依赖 + `dsh.profile.bundles` |
 | 8 | 写 `cordis.patch.yml` | `im-bridge`（含 `napcat.dir`、`groupWake`）+ `mcp-browser`（`insert`） |
 | 9 | 写人设 + 绑定会话 | 从 `roles/*.md` 抽正文写进 `personae`，并把 `private:<QQ>` / `group:<群>` 绑到对应角色 |
-| 10 | Playwright MCP / 语音 / 启动器 | 装 MCP；装 `edge-tts` 并配 Python 路径；补 `launcher-user.bat` |
+| 10 | **首次安装写面板参数** | `companion.maxBubbles=2`、`memory`、`proactiveCfg`（已配置的机器不覆盖） |
+| 11 | Playwright MCP / 语音 / 启动器 | 装 MCP；装 `edge-tts` 并配 Python 路径；补 `launcher-user.bat` |
+
+> **不会复制的**：QQ 号/群号（必须自己填）、语音 Key 与克隆音色、记忆/表情包/会话历史、NapCat 登录态。
+> 这些要么是隐私，要么只能人做。
 
 ## 四、参数
 

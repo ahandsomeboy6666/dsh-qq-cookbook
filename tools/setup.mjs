@@ -384,12 +384,15 @@ if (!settings) {
     { ...defaults.personae.group, prompt: await roleBody(defaults.personae.group.file) },
   ]
   const missing = wanted.filter((w) => !settings.personae.some((p) => p.id === w.id))
+  // 首次安装（还没有任何人设）时，顺带写入面板侧的体验参数（maxBubbles 等）。
+  // 已经配过的机器不覆盖，避免改掉别人的偏好。
+  const isFresh = settings.personae.length === 0
   // 绑定：私聊用软的人设，群用贴吧人设；不绑的话新群会套用全局默认
   const binds = []
   if (QQ) binds.push([`private:${QQ}`, defaults.personae.private.id])
   if (GROUP) binds.push([`group:${GROUP}`, defaults.personae.group.id])
   const needBind = binds.filter(([key, id]) => settings.contactProfiles[key]?.personaId !== id)
-  if (missing.length === 0 && needBind.length === 0) {
+  if (missing.length === 0 && needBind.length === 0 && !isFresh) {
     step('写入人设', 'SKIP', '角色与绑定都已存在')
   } else if (DRY) {
     step('写入人设', 'TODO', `补角色 ${missing.length} 个、绑定 ${needBind.length} 个`)
@@ -400,8 +403,13 @@ if (!settings) {
       settings.contactProfiles[key] = { ...(settings.contactProfiles[key] ?? {}), personaId: id }
     }
     if (!settings.activePersonaId) settings.activePersonaId = defaults.personae.private.id
+    if (isFresh && defaults.settings) {
+      for (const [section, values] of Object.entries(defaults.settings)) {
+        settings[section] = { ...(settings[section] ?? {}), ...values }
+      }
+    }
     await writeFile(SETTINGS, JSON.stringify(settings, null, 2) + '\n', 'utf8')
-    step('写入人设', 'OK', `角色 ${missing.length} 个；会话绑定 ${needBind.length} 个`)
+    step('写入人设', 'OK', `角色 ${missing.length} 个；会话绑定 ${needBind.length} 个${isFresh ? '；首次安装写入面板参数' : ''}`)
   }
 }
 

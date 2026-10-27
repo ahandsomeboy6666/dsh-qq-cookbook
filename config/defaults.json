@@ -1,4 +1,4 @@
-﻿{
+{
   "qq": "",
   "group": "",
   "wsUrl": "ws://127.0.0.1:6701",
@@ -16,5 +16,10 @@
     "bufferSize": 200,
     "recentLimit": 8,
     "nicknames": ["肥鱼", "大肥鱼"]
+  },
+  "settings": {
+    "companion": { "maxBubbles": 2 },
+    "memory": { "everyTurns": 40, "maxChars": 1200 },
+    "proactiveCfg": { "startHour": 9, "endHour": 23, "maxPerDay": 3 }
   }
 }
