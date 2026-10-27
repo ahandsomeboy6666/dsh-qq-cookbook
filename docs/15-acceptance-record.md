@@ -143,3 +143,32 @@ node checks/check-patches.mjs
 | 每条语音多一次模型调用（情境判断） | 体验 | 可接受；嫌慢可关「情绪自动判断」 |
 | 群聊 `wake: follow` 历史计数偏高 | 数据 | 修复前的累计，观察新日志即可 |
 | 小号余额 30 元 | 人工 | 仍需本人确认 |
+
+---
+
+## 2026-10-27 23:15 · 陌生人可用性改造
+
+### 改了什么
+
+| 项 | 之前 | 现在 |
+|---|---|---|
+| QQ / 群号 | `config/defaults.json` 写死作者号 | 空，必须 `--qq` 或交互输入 |
+| 首次运行 | 无交互 | 会问「你的 QQ 号」「要接的群号（可空）」 |
+| NapCat | 只提示"自己下载" | 自动下 OneKey（1MB）；`--install-napcat` 跑官方安装器（300MB） |
+| 会话绑定 | setup 不写 | 写 `private:<QQ>`、`group:<群>` |
+| 语音配置 | 强制改 sweet | 已有引擎（MiniMax）不被覆盖，只补 Python 路径 |
+
+### 实测（陌生人视角）
+
+| 场景 | 结果 |
+|---|---|
+| 空 `DSH_HOME` | `[FAIL] DSH desktop profile ... 先启动一次 DSH 再重跑` |
+| 不给 `--qq` | 非 dry-run 报错并给用法；dry-run 用占位号 |
+| 全新 clone（无 vendor） | `[TODO] clone 插件` / `[TODO] NapCat 本体` / `[TODO] 绑定 1 个`，顺序正确 |
+| 本机已配好 | 全 SKIP，幂等 |
+
+### 仍然要人做的（不可自动化）
+
+1. 装 DSH 桌面端并登录一次（UAC + 账号）
+2. NapCat 扫码（登录态绑设备）
+3. 小号只充 30 元
