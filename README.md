@@ -19,6 +19,18 @@
 
 体验评分见 [评分卡](docs/references/experience-scorecard.md)，生态调研见 [prior art](docs/references/prior-art.md)。
 
+## 一键启动（日常）
+
+双击 `tools\一键启动肥鱼.bat`：自动检查并启动 NapCat、DSH，再验证桥接是否连上。
+
+`
+[1/3] NapCat（6700）... 已在运行
+[2/3] DSH 桌面端 ... 已在运行
+[3/3] 桥接状态 ... ok 已连接
+  实测 probe-onebot ... ok connected，selfId=3866560965
+`
+
+首次部署（还没装插件）才需要下面的 D0–D3。
 ## 快速开始（D0–D3）
 
 ```powershell

@@ -60,3 +60,14 @@ node cli.mjs doctor                  # NapCat / 插件 都 PASS
 | 收到但不回 | `allowUsers` 是否含你的号；模型/凭据是否可用 |
 | 群聊不回 | 是否 @；`allowGroups` 是否含该群；`groupRequireAt` |
 | 人设不生效 | `presetRev` 是否 +1，或是否换了新会话 |
+## 日常启动
+
+双击项目根目录的 `tools\一键启动肥鱼.bat`。它会：
+
+1. 检查 NapCat 6700 是否在跑，没跑就启动 
+apcat.quick.bat；
+2. 检查 DSH 桌面端是否在跑，没跑就启动；
+3. 等桥接连上 6701，并跑一次 probe-onebot 验证；
+4. 输出 connected，selfId=... 就是好了。
+
+> NapCat 需要注入 QQ 进程，DSH 沙箱里起不来，所以这个脚本要在**普通终端/双击**运行，不要在 DSH 会话里跑。
