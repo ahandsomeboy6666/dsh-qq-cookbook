@@ -128,6 +128,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 环境（NapCat / cheems / 人设） | ✅ 已就绪（2026-10-27） |
 | 本地补丁（群聊唤醒层等） | ✅ 已生效，见 [补丁清单](docs/12-bridge-patches.md) |
 | 浏览器能力（Playwright MCP） | ✅ 已生效，见 [浏览器能力](docs/13-browser-mcp.md) |
+| 语音（MiniMax 克隆音色 / edge-tts 备用） | ✅ 已生效，见 [语音](docs/17-voice.md) |
 
 ## 状态
 
@@ -137,3 +138,4 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | D1 | 装 cheems，私聊/群聊打通 | ✅ 完成（私聊 + 群聊均通，含空 @） |
 | D2 | 私聊/群聊两套人设 | ✅ 完成（`feiyu` / `feiyu-group`，preset=standard） |
 | D3 | 浏览器能力 + 30 元零花钱授权 | ✅ 浏览器已通；额度只靠「小号只充 30 元」的物理上限，不写人设、不做代码闸门（见 [说明](docs/14-allowance.md)） |
+| 附加 | 语音（MiniMax 克隆音色）、群聊唤醒层、贴吧风群聊人设 | ✅ 已生效，见 [语音](docs/17-voice.md) / [补丁清单](docs/12-bridge-patches.md) |
