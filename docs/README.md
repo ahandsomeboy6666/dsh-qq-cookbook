@@ -39,6 +39,7 @@
 | [docs/15-acceptance-record.md](15-acceptance-record.md) | **验收记录**：每次验收的日期、命令、结果、遗留 | 已定 |
 | [docs/16-one-command.md](16-one-command.md) | **一个命令恢复**：`tools/setup.mjs` 做什么、不做什么、边界与排查 | 已定 |
 | [docs/17-voice.md](17-voice.md) | **语音（TTS）**：四个引擎、edge-tts 装法、三个坑与验收 | 已生效 |
+| [docs/18-song-cover.md](18-song-cover.md) | **唱歌选型**：人声分离 + 零样本音色转换，两阶段路线与待验证项 | 选型中 |
 
 ## 决策记录（ADR）
 

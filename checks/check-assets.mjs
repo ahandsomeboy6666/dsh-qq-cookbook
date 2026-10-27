@@ -123,7 +123,7 @@ check(
 
 // ---------------------------------------------------------------- 2. 任务卡五段
 const TASK_HEADINGS = ['目标', '输入', '输出', '验收', '不做什么']
-const EXECUTABLE = /`(node|npm|npx|pwsh|powershell|python|git|dsh|curl|Invoke-WebRequest)\b/
+const EXECUTABLE = /`(node|npm|npx|pwsh|powershell|python|git|dsh|curl|Invoke-WebRequest|ffmpeg|ffprobe)\b/
 let taskFiles = []
 try {
   const { readdir } = await import('node:fs/promises')
