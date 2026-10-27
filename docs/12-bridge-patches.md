@@ -38,11 +38,14 @@
     groupWake:
       enabled: true
       probability: 0.1      # 未 @ 时的唤醒概率
-      followMinutes: 5      # 唤醒后 5 分钟内继续接
+      followMinutes: 0      # 0 = 关闭跟随窗口（不然窗口内你每句话她都接）
       bufferSize: 200
       recentLimit: 8
       nicknames: ['肥鱼', '大肥鱼']
 ```
+
+> **`followMinutes` 默认 0**。非 0 时，她开口后这段时间内「同一个人」继续发消息都会唤醒她——
+> 实战中这等于「你连发三句她要接三句」，是话多最主要的来源。要连续对话的体感再调回 2–3 分钟。
 
 两个坑：
 

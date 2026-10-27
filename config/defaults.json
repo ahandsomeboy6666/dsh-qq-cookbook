@@ -1,4 +1,4 @@
-{
+﻿{
   "qq": "",
   "group": "",
   "wsUrl": "ws://127.0.0.1:6701",
@@ -12,7 +12,7 @@
   },
   "groupWake": {
     "probability": 0.1,
-    "followMinutes": 5,
+    "followMinutes": 0,
     "bufferSize": 200,
     "recentLimit": 8,
     "nicknames": ["肥鱼", "大肥鱼"]
