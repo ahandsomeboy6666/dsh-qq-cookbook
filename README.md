@@ -8,6 +8,8 @@
 >
 > 与 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 无代码关系，只引用其已验证结论作为事实基线。
 
+> **把这个仓库丢给 AI 安装？** 让它先读 [BOOTSTRAP.md](BOOTSTRAP.md)——那是给 agent 的分步手册，写明哪一步必须停下来等人。
+
 ## 一分钟选型
 
 | 你的目标 | 选这条路 | 一句话理由 |
