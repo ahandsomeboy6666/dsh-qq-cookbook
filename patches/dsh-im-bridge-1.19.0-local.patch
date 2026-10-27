@@ -185,3 +185,23 @@ index 83d8357..72c316e 100644
      let agent=agents?.get?.(sessionId);if(!agent&&typeof ctx.sessionController.resolveAgent==='function'){const resolved=await ctx.sessionController.resolveAgent(sessionId);agent=resolved?.agent||agents?.get?.(sessionId);}
      if(agent&&typeof agents?.withInitiator==='function')return agents.withInitiator(agent,()=>host.search({query}));
      return host.search({query});
+diff --git a/operation-context.js b/operation-context.js
+index 7181d04..d10059d 100644
+--- a/operation-context.js
++++ b/operation-context.js
+@@ -11,7 +11,14 @@ export function recentOperationContext(rows,{key='',accountId='',personaId='',fl
+ export function operationContextStamp(context){return createHash('sha256').update(JSON.stringify(context)).digest('hex');}
+ export function operationContextHint(context){return '【操作前最近8条对话】\n'+OPERATION_CONTEXT_RULES+'\n'+JSON.stringify(context);}
+ export function parseOperationReview(raw,{kind,request,emotion='auto'}={}){
+- let data;try{data=typeof raw==='string'?JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g,'')):raw;}catch{throw Error('情境判断没有返回可用格式，本次未调用外部功能');}
++ // 模型时常在 JSON 前后带解释文字；先按整体解析，失败再从文本里抠出第一个对象。
++ let data;
++ const text=typeof raw==='string'?raw.trim().replace(/^```(?:json)?\s*|\s*```$/g,''):raw;
++ try{data=typeof text==='string'?JSON.parse(text):text;}catch{
++   const block=String(text).match(/\{[\s\S]*\}/);
++   if(block){try{data=JSON.parse(block[0]);}catch{data=undefined;}}
++   if(data===undefined)throw Error('情境判断没有返回可用格式，本次未调用外部功能');
++ }
+  if(!data||typeof data!=='object'||Array.isArray(data)||!operationText(data.intent,200))throw Error('情境判断没有给出当前意图，本次未调用外部功能');
+  const delivery=data.delivery&&typeof data.delivery==='object'?data.delivery:{},allowed=['auto','natural','happy','gentle','sad','surprised','serious'];
+  const selected=emotion!=='auto'&&allowed.includes(emotion)?emotion:allowed.includes(delivery.emotion)?delivery.emotion:'natural';

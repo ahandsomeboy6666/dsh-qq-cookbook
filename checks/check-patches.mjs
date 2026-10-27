@@ -11,11 +11,14 @@ import { homedir } from 'node:os'
 
 const ROOT = join(import.meta.dirname, '..')
 const VENDOR = join(ROOT, 'vendor', 'dsh-im-bridge', 'index.js')
+const VENDOR_CTX = join(ROOT, 'vendor', 'dsh-im-bridge', 'operation-context.js')
 const PROFILE = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'profiles', 'desktop', 'cordis.patch.yml')
 const json = process.argv.includes('--json')
 
 let code = null
+let ctxCode = ''
 try { code = await readFile(VENDOR, 'utf8') } catch { /* 未安装 */ }
+try { ctxCode = await readFile(VENDOR_CTX, 'utf8') } catch { /* 老版本没有这个文件 */ }
 
 if (code === null) {
   if (json) console.log(JSON.stringify({ skipped: true, reason: 'vendor/dsh-im-bridge 不存在' }, null, 2))
@@ -29,8 +32,10 @@ const PATCHES = [
   ['P3 学习检索用 standard', "agentPreset:'standard'"],
   ['P4 群聊唤醒层', 'ambient: buffered'],
   ['P5 群回复不 @ 人', 'groupReplyAt === true'],
+  ['P6 语音标签兜底', '\\|\\s*语音\\s*\\|'],
+  ['P7 情境判断宽容解析', 'const block=String(text).match'],
 ]
-const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: code.includes(needle) }))
+const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 
 // ---- 配置：cordis.patch.yml 里的 im-bridge 段 ----
 let config = ''
