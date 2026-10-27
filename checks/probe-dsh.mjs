@@ -24,14 +24,53 @@ const opt = (name) => {
 }
 
 const DSH_URL_ARG = opt('--dsh-url') ?? process.env.DSH_URL
+// 桌面端端口每次重启都会变（曾见过 50460 / 61432 / 57743），所以先自动发现，
+// 再退回两个历史默认值。发现失败也不影响后续判定。
 const DSH_URLS = DSH_URL_ARG
   ? [DSH_URL_ARG]
-  : ['http://127.0.0.1:3080', 'http://127.0.0.1:50460']
+  : [...(await discoverDshBase()), 'http://127.0.0.1:3080', 'http://127.0.0.1:50460']
 const ONEBOT_URL = opt('--onebot-url') ?? process.env.ONEBOT_URL ?? 'http://127.0.0.1:6700'
 const DSH_HOME = process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh')
 
 async function safeStat(p) {
   try { return await stat(p) } catch { return null }
+}
+
+/**
+ * 自动发现本机 DSH Web 端口：列 LISTENING，排除 OneBot/NapCat 的已知端口，
+ * 再对剩下的逐个 GET /，认页面里带 dsh / DeepSeek Harness 的。
+ */
+async function discoverDshBase() {
+  try {
+    const { spawnSync } = await import('node:child_process')
+    const r = spawnSync(process.platform === 'win32' ? 'netstat' : 'ss',
+      process.platform === 'win32' ? ['-ano'] : ['-tln'],
+      { encoding: 'utf8', windowsHide: true, timeout: 5000 })
+    if (r.status !== 0 || !r.stdout) return []
+    const ports = new Set()
+    for (const line of r.stdout.split(/\r?\n/)) {
+      if (!/LISTENING/.test(line)) continue
+      const m = line.match(/127\.0\.0\.1:(\d{2,5})\s/)
+      if (m) ports.add(Number(m[1]))
+    }
+    const skip = new Set([6099, 6700, 6701])
+    const candidates = [...ports].filter((p) => !skip.has(p) && p >= 1024)
+    const hits = []
+    await Promise.all(candidates.map(async (port) => {
+      const url = `http://127.0.0.1:${port}`
+      try {
+        const res = await fetch(url + '/', { signal: AbortSignal.timeout(400), redirect: 'manual' })
+        const type = res.headers.get('content-type') ?? ''
+        if (res.status === 401) { hits.push(url); return }
+        if (!type.includes('text/html')) return
+        const body = (await res.text()).slice(0, 4000)
+        if (/dsh|DeepSeek Harness/i.test(body)) hits.push(url)
+      } catch { /* 不是 HTTP 或超时 */ }
+    }))
+    return hits
+  } catch {
+    return []
+  }
 }
 
 async function readJson(p) {
