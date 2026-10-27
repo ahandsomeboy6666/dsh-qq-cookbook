@@ -1,31 +1,35 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * 一键恢复：把 clone 下来的 cookbook 变成一台能跑的 QQ 桥接。
  *
- *   node tools/setup.mjs              # 执行
- *   node tools/setup.mjs --dry-run    # 只报告要做什么
+ *   node tools/setup.mjs                    # 交互（会问 QQ 号 / 群号）
+ *   node tools/setup.mjs --dry-run          # 只报告要做什么
  *   node tools/setup.mjs --qq 123 --group 456
- *   node tools/setup.mjs --skip-mcp   # 不装 Playwright MCP
+ *   node tools/setup.mjs --skip-mcp         # 不装 Playwright MCP
+ *   node tools/setup.mjs --install-napcat   # 缺 NapCat 时自动跑官方安装器（约 300MB）
+ *   node tools/setup.mjs --no-download      # DSH 没装时只给地址
  *
  * 幂等：已完成的步骤会跳过。会备份被改的文件（*.bak-<时间戳>）。
  *
- * 仍然需要人做的三件事（脚本不做，只提示）：
+ * 仍然需要人做的两件事（脚本不做，只提示）：
  *   1. 启动 NapCat 并扫码登录
- *   2. 把 QQ 号填进白名单（默认值已写，改人/换号时才需要）
- *   3. 小号只充 30 元
+ *   2. 小号只充 30 元
  */
-import { readFile, writeFile, copyFile, readdir, mkdir, access, open } from 'node:fs/promises'
+import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { createInterface } from 'node:readline/promises'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run')
 const SKIP_MCP = args.includes('--skip-mcp')
 const NO_DOWNLOAD = args.includes('--no-download')
+const INSTALL_NAPCAT = args.includes('--install-napcat')
 // 桌面端官方更新源（来自已安装的 resources/app-update.yml）
 const DSH_FEED = 'https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml'
 const opt = (name, fallback) => {
@@ -42,8 +46,15 @@ const VENDOR = join(ROOT, 'vendor', 'dsh-im-bridge')
 const PATCH = join(ROOT, 'patches', 'dsh-im-bridge-1.19.0-local.patch')
 
 const defaults = JSON.parse(await readFile(join(ROOT, 'config', 'defaults.json'), 'utf8'))
-const QQ = String(opt('--qq', defaults.qq))
-const GROUP = String(opt('--group', defaults.group))
+let QQ = String(opt('--qq', defaults.qq ?? '')).trim()
+let GROUP = String(opt('--group', defaults.group ?? '')).trim()
+// 交互补齐：只有真实终端才问，避免脚本/CI 卡住
+if (!DRY && (!QQ || GROUP === '') && process.stdin.isTTY) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  if (!QQ) QQ = (await rl.question('  你的 QQ 号（白名单，只回这个人）：')).trim()
+  if (GROUP === '') GROUP = (await rl.question('  要接的 QQ 群号（回车跳过，不接群）：')).trim()
+  rl.close()
+}
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
 
 const steps = []
@@ -70,6 +81,48 @@ async function findDsh() {
     if (await exists(join(dir, 'resources', 'app-update.yml'))) return dir
   }
   return ''
+}
+
+/** 找已安装的 NapCat 目录（含 napcat.bat 的 *Shell* 子目录）；没有返回空串 */
+async function findNapcat() {
+  const base = join(ROOT, 'tools', 'napcat')
+  if (!(await exists(base))) return ''
+  for (const entry of await readdir(base, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const dir = join(base, entry.name)
+    if ((await exists(join(dir, 'napcat.bat'))) || (await exists(join(dir, 'launcher-user.bat')))) return dir
+  }
+  return ''
+}
+
+/** 下载 NapCat 的 OneKey 包（约 1MB，内部是安装器）并解压到 tools/napcat */
+async function downloadNapcatOneKey() {
+  const url = `https://github.com/${defaults.napcatRepo}/releases/latest/download/NapCat.Shell.Windows.OneKey.zip`
+  const dir = join(ROOT, 'tools', 'napcat')
+  await mkdir(dir, { recursive: true })
+  const zip = join(dir, 'NapCat.OneKey.zip')
+  const res = await fetch(url)
+  if (!res.ok || !res.body) throw new Error('下载失败 HTTP ' + res.status)
+  const fh = await open(zip, 'w')
+  let bytes = 0
+  for await (const chunk of res.body) { await fh.write(chunk); bytes += chunk.length }
+  await fh.close()
+  const unzip = run('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${dir}' -Force`])
+  if (unzip.status !== 0) throw new Error('解压失败：' + String(unzip.stderr ?? '').slice(0, 120))
+  await rm(zip, { force: true })
+  return { dir, bytes }
+}
+
+/** 跑 NapCat 官方安装器（会下载 QQ，约 300MB） */
+function runNapcatInstaller(dir) {
+  const installer = join(dir, 'NapCatInstaller.exe')
+  if (!existsSync(installer)) return { status: -1, stderr: '找不到 NapCatInstaller.exe' }
+  return spawnSync(installer, [], {
+    cwd: dir,
+    encoding: 'utf8',
+    windowsHide: false,
+    timeout: 30 * 60 * 1000,
+  })
 }
 
 /** 从官方 feed 下载安装包并校验 sha512；已下载过则直接复用 */
@@ -109,9 +162,25 @@ async function backup(file) {
 console.log('\n一键恢复 QQ 桥接\n')
 console.log(`  项目目录   ${ROOT}`)
 console.log(`  DSH_HOME   ${DSH_HOME}`)
-console.log(`  QQ / 群    ${QQ} / ${GROUP}`)
+console.log(`  QQ / 群    ${QQ || '(未填)'} / ${GROUP || '(不接群)'}`)
 if (DRY) console.log('  模式       dry-run（不写文件）')
 console.log('')
+
+if (!QQ || !/^\d{5,12}$/.test(QQ)) {
+  if (DRY) {
+    QQ = '000000000'
+    console.log('  (dry-run：未提供 --qq，用占位号展示步骤)')
+    console.log('')
+  } else {
+    console.error('  缺少或非法的 QQ 号。这是白名单——只回这个人。')
+    console.error('  用法：node tools/setup.mjs --qq 123456789 [--group 123456]')
+    process.exit(1)
+  }
+}
+if (GROUP && !/^\d{5,12}$/.test(GROUP)) {
+  console.error(`  群号格式不对：${GROUP}（要么留空，要么 5-12 位数字）`)
+  process.exit(1)
+}
 
 /* 1. 前置检查 */
 const nodeMajor = Number(process.versions.node.split('.')[0])
@@ -205,9 +274,30 @@ if (!pkg) {
   }
 }
 
-/* 4. cordis.patch.yml：im-bridge 配置 + mcp-browser */
-const napcatDir = join(ROOT, 'tools', 'napcat', 'NapCat.52892.Shell')
-const napcatLauncher = join(napcatDir, 'launcher-user.bat')
+/* 4. NapCat：检测 → 下载 OneKey 安装器 → 可选自动安装 */
+let napcatDir = await findNapcat()
+if (napcatDir) {
+  step('NapCat 本体', 'SKIP', napcatDir)
+} else if (DRY) {
+  step('NapCat 本体', 'TODO', '下载 OneKey（约 1MB），--install-napcat 时自动装 QQ + NapCat（约 300MB）')
+} else {
+  try {
+    const got = await downloadNapcatOneKey()
+    step('下载 NapCat 安装包', 'OK', `${(got.bytes / 1024).toFixed(0)}KB → ${got.dir}`)
+  } catch (error) {
+    step('下载 NapCat 安装包', 'FAIL', String(error?.message ?? error).slice(0, 140))
+  }
+  if (INSTALL_NAPCAT) {
+    const r = runNapcatInstaller(join(ROOT, 'tools', 'napcat'))
+    step('安装 NapCat', r.status === 0 ? 'OK' : 'FAIL', r.status === 0 ? '已下载 QQ 并部署' : String(r.stderr ?? '').slice(0, 120))
+    napcatDir = await findNapcat()
+  } else {
+    step('安装 NapCat', 'TODO', '双击 tools/napcat/NapCatInstaller.exe，或加 --install-napcat')
+  }
+}
+const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.bat')
+
+/* 5. cordis.patch.yml：im-bridge 配置 + mcp-browser */
 let cordis = ''
 try { cordis = await readFile(CORDIS, 'utf8') } catch { /* 无配置文件 */ }
 if (!cordis) {
@@ -215,6 +305,10 @@ if (!cordis) {
 } else {
   const blocks = []
   if (!cordis.includes('id: im-bridge')) {
+    const groupLine = GROUP ? `    allowGroups: ['${GROUP}']` : '    allowGroups: []'
+    const napcatBlock = napcatDir
+      ? `    napcat:\n      dir: '${napcatDir.replaceAll('\\', '/')}'\n      launcher: '${(napcatLauncher || join(napcatDir, 'launcher-user.bat')).replaceAll('\\', '/')}'`
+      : '    # NapCat 还没装：装好后重跑本脚本会自动补上目录'
     blocks.push(`
 # QQ 桥接：NapCat 目录 + 群聊唤醒（由 tools/setup.mjs 生成）
 - id: im-bridge
@@ -223,14 +317,12 @@ if (!cordis) {
     wsUrl: '${defaults.wsUrl}'
     accessToken: ''
     allowUsers: ['${QQ}']
-    allowGroups: ['${GROUP}']
+${groupLine}
     groupRequireAt: true
     agentPreset: standard
     presetRev: '1'
     maxReplyChars: 1500
-    napcat:
-      dir: '${napcatDir.replaceAll('\\', '/')}'
-      launcher: '${napcatLauncher.replaceAll('\\', '/')}'
+${napcatBlock}
     groupReplyAt: false
     groupWake:
       enabled: true
@@ -271,7 +363,7 @@ if (!cordis) {
   }
 }
 
-/* 5. 人设：写进 settings.json（面板生效的那份） */
+/* 5. 人设：写进 settings.json，并把会话绑到对应角色 */
 async function roleBody(file) {
   const text = await readFile(join(ROOT, file), 'utf8')
   return text
@@ -286,21 +378,30 @@ if (!settings) {
   step('写入人设', 'SKIP', 'settings.json 不存在：先启动 DSH 让插件初始化，再重跑本脚本')
 } else {
   settings.personae ??= []
+  settings.contactProfiles ??= {}
   const wanted = [
     { ...defaults.personae.private, prompt: await roleBody(defaults.personae.private.file) },
     { ...defaults.personae.group, prompt: await roleBody(defaults.personae.group.file) },
   ]
   const missing = wanted.filter((w) => !settings.personae.some((p) => p.id === w.id))
-  if (missing.length === 0) {
-    step('写入人设', 'SKIP', '两份都已存在')
+  // 绑定：私聊用软的人设，群用贴吧人设；不绑的话新群会套用全局默认
+  const binds = []
+  if (QQ) binds.push([`private:${QQ}`, defaults.personae.private.id])
+  if (GROUP) binds.push([`group:${GROUP}`, defaults.personae.group.id])
+  const needBind = binds.filter(([key, id]) => settings.contactProfiles[key]?.personaId !== id)
+  if (missing.length === 0 && needBind.length === 0) {
+    step('写入人设', 'SKIP', '角色与绑定都已存在')
   } else if (DRY) {
-    step('写入人设', 'TODO', missing.map((m) => m.id).join(', '))
+    step('写入人设', 'TODO', `补角色 ${missing.length} 个、绑定 ${needBind.length} 个`)
   } else {
     await backup(SETTINGS)
     for (const m of missing) settings.personae.push({ id: m.id, name: m.name, preset: 'standard', prompt: m.prompt })
+    for (const [key, id] of needBind) {
+      settings.contactProfiles[key] = { ...(settings.contactProfiles[key] ?? {}), personaId: id }
+    }
     if (!settings.activePersonaId) settings.activePersonaId = defaults.personae.private.id
     await writeFile(SETTINGS, JSON.stringify(settings, null, 2) + '\n', 'utf8')
-    step('写入人设', 'OK', missing.map((m) => m.id).join(', '))
+    step('写入人设', 'OK', `角色 ${missing.length} 个；会话绑定 ${needBind.length} 个`)
   }
 }
 
@@ -352,7 +453,17 @@ if (!pythonPath) {
       pythonLib: PYLIB.replaceAll('\\', '/'),
     }
     const cur = voiceSettings.voice ?? {}
-    if (cur.enabled !== true || cur.engine !== 'sweet' || cur.pythonPath !== want.pythonPath) {
+    if (cur.enabled === true && cur.engine) {
+      // 已经配过（比如 MiniMax 克隆音色）：只补 Python 路径，绝不覆盖引擎
+      if (cur.pythonPath === want.pythonPath) {
+        step('语音配置', 'SKIP', `引擎 ${cur.engine}`)
+      } else {
+        await backup(SETTINGS)
+        voiceSettings.voice = { ...cur, pythonPath: want.pythonPath, pythonLib: want.pythonLib }
+        await writeFile(SETTINGS, JSON.stringify(voiceSettings, null, 2) + '\n', 'utf8')
+        step('语音配置', 'OK', `保留 ${cur.engine}，补 Python 路径`)
+      }
+    } else if (cur.enabled !== true || cur.engine !== 'sweet' || cur.pythonPath !== want.pythonPath) {
       await backup(SETTINGS)
       voiceSettings.voice = { ...cur, ...want }
       await writeFile(SETTINGS, JSON.stringify(voiceSettings, null, 2) + '\n', 'utf8')
@@ -364,41 +475,41 @@ if (!pythonPath) {
 }
 
 /* 8. NapCat 启动器 */
-if (await exists(napcatDir)) {
-  if (await exists(napcatLauncher)) {
-    step('NapCat 启动器', 'SKIP', 'launcher-user.bat 已存在')
-  } else if (DRY) {
-    step('NapCat 启动器', 'TODO', napcatLauncher)
-  } else {
-    await writeFile(napcatLauncher, [
-      '@echo off',
-      'chcp 65001 >nul',
-      'cd /d "%~dp0"',
-      'set "NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json"',
-      'set "NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js"',
-      'set "NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll"',
-      'set "NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe"',
-      'set "NAPCAT_MAIN_PATH=%cd%\\napcat.mjs"',
-      '"%NAPCAT_LAUNCHER_PATH%" "%cd%\\QQ.exe" "%NAPCAT_INJECT_PATH%" %*',
-      'exit /b %ERRORLEVEL%',
-      '',
-    ].join('\r\n'), 'utf8')
-    step('NapCat 启动器', 'OK', 'launcher-user.bat')
-  }
+if (napcatDir === '') {
+  step('NapCat 启动器', 'SKIP', 'NapCat 还没装，装好后重跑本脚本')
+} else if (await exists(napcatLauncher)) {
+  step('NapCat 启动器', 'SKIP', 'launcher-user.bat 已存在')
+} else if (DRY) {
+  step('NapCat 启动器', 'TODO', napcatLauncher)
 } else {
-  step('NapCat 启动器', 'SKIP', 'tools/napcat 不存在：NapCat 需单独下载')
+  await writeFile(napcatLauncher, [
+    '@echo off',
+    'chcp 65001 >nul',
+    'cd /d "%~dp0"',
+    'set "NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json"',
+    'set "NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js"',
+    'set "NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll"',
+    'set "NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe"',
+    'set "NAPCAT_MAIN_PATH=%cd%\\napcat.mjs"',
+    '"%NAPCAT_LAUNCHER_PATH%" "%cd%\\QQ.exe" "%NAPCAT_INJECT_PATH%" %*',
+    'exit /b %ERRORLEVEL%',
+    '',
+  ].join('\r\n'), 'utf8')
+  step('NapCat 启动器', 'OK', 'launcher-user.bat')
 }
 
 summary()
 
 function summary() {
   const failed = steps.filter((s) => s.status === 'FAIL')
-  const todo = steps.filter((s) => s.status === 'TODO' || s.status === 'SKIP')
   console.log('\n  汇总：' + steps.map((s) => `${s.status}`).join(' '))
   if (failed.length) console.log(`  失败 ${failed.length} 项，见上。`)
+  const napcatHint = napcatDir
+    ? `启动 NapCat（${napcatDir} 下的 napcat.quick.bat）并扫码登录`
+    : '装 NapCat（解压后的 tools/napcat 里跑 NapCatInstaller.exe），再扫码登录'
   console.log(`
   接下来要人做：
-    1. 启动 NapCat（tools\\napcat\\NapCat.52892.Shell\\napcat.quick.bat）并扫码登录
+    1. ${napcatHint}
     2. 重启 DSH 桌面端（让 cordis.patch.yml 与插件依赖生效）
     3. 小号只充 30 元，不绑主卡
     4. 在 QQ 里私聊发一句，确认有回复

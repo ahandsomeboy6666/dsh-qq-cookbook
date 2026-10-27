@@ -1,9 +1,20 @@
-# 一个命令恢复
+# 一个命令恢复（给别人用版）
 
 > 目标：`git clone` 之后一条命令，恢复到能聊天的状态。
-> 现实：软件层能全自动，**登录态和钱这两件事只能人来**。
+> 现实：软件与配置全自动，**安装 DSH、NapCat 扫码、充钱这三件只能人做**。
 
-## 一、命令
+## 一、别人拉下来要过几关
+
+| # | 关卡 | 谁来做 | 说明 |
+|---|---|---|---|
+| 1 | 装 DSH 桌面端并**登录一次** | 人 | 脚本能下载安装包，但双击安装 + 登录必须人做 |
+| 2 | 填自己的 QQ 号/群号 | **脚本会问** | 白名单，不填就"她不回我" |
+| 3 | NapCat（约 300MB，含 QQ） | 脚本下载 + 人点安装器 | `--install-napcat` 可全自动跑 |
+| 4 | QQ 小号扫码登录 | 人 | 登录态绑设备，无法脚本化 |
+| 5 | 网络 | — | GitHub / npm / PyPI / 官网，任一不通会卡住 |
+| 6 | 语音 Key（可选） | 人 | 不配就用免费甜妹，不阻塞 |
+
+## 二、命令
 
 ```powershell
 git clone https://github.com/ahandsomeboy6666/dsh-qq-cookbook.git
@@ -11,89 +22,72 @@ cd dsh-qq-cookbook
 node tools/setup.mjs
 ```
 
-加参数：
+首次运行会问两句：
 
-```powershell
-node tools/setup.mjs --dry-run           # 只报告要做什么，不写文件
-node tools/setup.mjs --qq 123456 --group 789012
-node tools/setup.mjs --skip-mcp          # 不装 Playwright MCP
-node tools/setup.mjs --no-download       # DSH 没装时只给地址，不下载
+```
+  你的 QQ 号（白名单，只回这个人）：123456789
+  要接的 QQ 群号（回车跳过，不接群）：987654321
 ```
 
-**幂等**：重复执行只会跳过已完成项。改动前会备份成 `*.bak-<时间戳>`。
+也可以非交互：
 
-## 二、它做了什么（10 步）
+```powershell
+node tools/setup.mjs --qq 123456789 --group 987654321
+```
+
+## 三、它做了什么（10 步）
 
 | # | 步骤 | 细节 |
 |---|---|---|
 | 1 | 检查 Node ≥ 22 | 低版本直接失败 |
-| 2 | 检查 DSH 桌面端 | 常见路径找 `DeepSeek Harness.exe`；**找不到就去官方源下载安装包** |
-| 3 | 检查 desktop profile | `~/.dsh/profiles/desktop` 不存在就停（装完 DSH 要启动一次） |
-| 4 | clone 插件 | `cheems135/dsh-qq-bridge` → `vendor/dsh-im-bridge`，检出基线 `03afb9c` |
-| 5 | 打本地补丁 | `patches/dsh-im-bridge-1.19.0-local.patch`（5 处改动，含群聊唤醒层） |
-| 6 | 注册到 profile | `package.json` 加 `link:` 依赖 + `dsh.profile.bundles` |
-| 7 | 写 `cordis.patch.yml` | `im-bridge` 配置（含 `napcat.dir`、`groupWake`）+ `mcp-browser`（`insert`） |
-| 8 | 写人设 | 从 `roles/*.md` 抽正文，写进 `settings.json` 的 `personae` |
-| 9 | 装 Playwright MCP | `npm i -g @playwright/mcp` |
-| 10 | 建 NapCat 启动器 | 有 `tools/napcat` 时补 `launcher-user.bat`（走无 UAC 分支） |
+| 2 | 检查 DSH 桌面端 | 常见路径找不到 → 从官方源下载安装包（校验 sha512），提示双击安装 |
+| 3 | 检查 desktop profile | 不存在就停：「先启动一次 DSH 再重跑」 |
+| 4 | NapCat | 找 `tools/napcat/*Shell*`；没有就下 OneKey（约 1MB），`--install-napcat` 时再跑官方安装器（约 300MB） |
+| 5 | clone 插件 | `cheems135/dsh-qq-bridge` → `vendor/dsh-im-bridge`，检出基线 `03afb9c` |
+| 6 | 打本地补丁 | `patches/*.patch`，7 处改动 |
+| 7 | 注册到 profile | `package.json` 加 `link:` 依赖 + `dsh.profile.bundles` |
+| 8 | 写 `cordis.patch.yml` | `im-bridge`（含 `napcat.dir`、`groupWake`）+ `mcp-browser`（`insert`） |
+| 9 | 写人设 + 绑定会话 | 从 `roles/*.md` 抽正文写进 `personae`，并把 `private:<QQ>` / `group:<群>` 绑到对应角色 |
+| 10 | Playwright MCP / 语音 / 启动器 | 装 MCP；装 `edge-tts` 并配 Python 路径；补 `launcher-user.bat` |
 
-### 关于 DSH 下载
+## 四、参数
 
-检测顺序：`DSH_DESKTOP_DIR` → `E:\dsh桌面端` → `%LOCALAPPDATA%\Programs\DeepSeek Harness` → `%ProgramFiles%\DeepSeek Harness`。
-
-找不到时读官方更新源（来自已安装端的 `resources/app-update.yml`）：
-
-```
-清单  https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml
-安装包 https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-<版本>-win-x64.exe
-```
-
-下载到 `tools/downloads/`（约 290MB，已 gitignore），**校验 sha512** 后打印路径，然后退出。
-脚本不静默安装（避免 UAC/杀软拦截），你双击装完再重跑一次即可。
-
-`--no-download` 只打印清单地址，不下载。
-
-## 三、它不做什么（三条人工）
-
-| 事 | 为什么不能自动 |
+| 参数 | 作用 |
 |---|---|
-| **NapCat 扫码登录** | 登录态在 QQ 客户端，无法脚本化；`tools/napcat/` 1.4GB 也不进仓库 |
-| **白名单** | 默认值已写（`config/defaults.json`），换人/换群时才要改 |
-| **小号只充 30 元** | 钱的事脚本管不了，这是整套额度的唯一真实约束 |
+| `--qq <号>` | 必填（非交互时），白名单 |
+| `--group <号>` | 可选，不填 = 不接群 |
+| `--dry-run` | 只报告，不写文件；缺 QQ 时用占位号展示 |
+| `--skip-mcp` | 不装 Playwright MCP |
+| `--install-napcat` | 缺 NapCat 时自动跑官方安装器（约 300MB） |
+| `--no-download` | DSH 没装时只给地址，不下载 |
 
-做完人工三步后：
+**幂等**：重复执行只跳过；改文件前备份 `*.bak-<时间戳>`。
+**不覆盖已有语音配置**：已经配了 MiniMax/Breeze 的，只补 Python 路径，不改引擎。
 
-```powershell
-node cli.mjs status
-node checks/check-patches.mjs
-```
+## 五、做不到的三件
 
-## 四、仓库里现在有哪些可复现资产
+| 事 | 为什么 |
+|---|---|
+| 装 DSH + 登录 | Electron 安装包要 UAC 确认；登录态在账号 |
+| NapCat 扫码 | 登录态绑手机/设备 |
+| 小号只充 30 元 | 钱的事，也是整套额度的唯一真实约束 |
 
-```
-patches/dsh-im-bridge-1.19.0-local.patch   插件 5 处改动，git apply 即可
-config/defaults.json                       账号、端口、唤醒参数的默认值
-tools/setup.mjs                            一键安装（幂等）
-tools/一键启动肥鱼.bat                     日常启动（NapCat + DSH + 自检）
-roles/*.md                                 两套人设的唯一真源
-docs/12-bridge-patches.md                  补丁说明书（升级后重打）
-```
+## 六、陌生人场景实测（2026-10-27）
 
-## 五、为什么不能做到 100%
+| 场景 | 结果 |
+|---|---|
+| 空 `DSH_HOME` | `[FAIL] DSH desktop profile 找不到 ... 先启动一次 DSH 再重跑` |
+| 不给 `--qq` | 非 dry-run 直接报错并给用法；dry-run 用占位号 |
+| 全新 clone（无 vendor） | `[TODO] clone 插件`，后续步骤正确等待 |
+| 本机已配好 | 全 SKIP，幂等 |
 
-- **NapCat 1.4GB**：GitHub 单个文件上限 100MB，放不进仓库
-- **QQ 登录态**：必须扫码，且和手机/设备绑定
-- **DSH 安装**：安装包能自动下载，但**双击安装要人点**（UAC + 首次登录）
-- **模型凭据**：`~/.dsh/.credentials.yaml` 依赖 DSH 登录
-
-所以「一个命令」的边界是：**下载、软件配置、补丁、人设全自动；安装、扫码、资金人工各一次**。
-
-## 六、排查
+## 七、排查
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
-| `apply --check` 失败 | 上游更新了，补丁基线不再匹配 | 看 [12](12-bridge-patches.md) 第五节手动重打 |
-| 人设没写进去 | `settings.json` 不存在（插件没启动过） | 先启动 DSH 一次，再重跑脚本 |
-| 端口不对 | NapCat 不在默认 6700/6701 | `--qq` 之外，改 `config/defaults.json` 的 `wsUrl` |
-| MCP 没起来 | 全局装失败 / 路径不对 | `npm i -g @playwright/mcp`，或 `--skip-mcp` 后手动配 |
-| 下载 DSH 失败 | 网络到 `download.deepseek.com` 不通 | 加 `--no-download` 拿地址，手动下 |
+| 她不回我 | 白名单里是别人的号 | 重跑 `--qq 你的号` |
+| `apply --check` 失败 | 上游更新，补丁基线不匹配 | 看 [12](12-bridge-patches.md) 手动重打 |
+| 人设没写进去 | `settings.json` 不存在（插件没启动过） | 先启动 DSH 一次再重跑 |
+| 群里用私聊性格 | 群没绑人设 | 重跑 setup（会自动绑 `group:<群>`） |
+| MCP 没起来 | 全局装失败 | `npm i -g @playwright/mcp`，或 `--skip-mcp` |
+| NapCat 起不来 | 没装或没扫码 | `tools/napcat` 下跑 `NapCatInstaller.exe`，再 `napcat.quick.bat` |
