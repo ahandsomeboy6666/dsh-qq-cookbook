@@ -38,6 +38,7 @@ const PATCHES = [
   ['P9 昵称只在像叫她时算', '像在叫她'],
   ['P10 群聊放行只读联网', 'group allowed read-only web tool'],
   ['P11 群聊 guard 放行联网', '群里只开放只读联网查询'],
+  ['P12 @别人还原昵称', 'resolveMemberName'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 

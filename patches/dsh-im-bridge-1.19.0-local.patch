@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..cd8b9e6 100644
+index 83d8357..11598bc 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -130,7 +130,7 @@ index 83d8357..cd8b9e6 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4824,35 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4824,54 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -140,6 +140,25 @@ index 83d8357..cd8b9e6 100644
 +  const groupFollowUntil = new Map(); // groupId -> 时间戳：唤醒后的跟随窗口
 +  const groupLastWake = new Map(); // groupId -> 上次开口时间（防连珠炮）
 +  const groupWakeSender = new Map(); // groupId -> 上次「主动找她说话」的人
++  const groupMemberNames = new Map(); // `${groupId}:${qq}` -> { name, at }
++
++  /** 把 @QQ号 还原成群名片/昵称；查不到就保留原号，不阻塞消息。 */
++  async function resolveMemberName(groupId, qq) {
++    const key = `${groupId}:${qq}`;
++    const hit = groupMemberNames.get(key);
++    if (hit && Date.now() - hit.at < 6 * 3600 * 1000) return hit.name;
++    try {
++      const info = await request('get_group_member_info', {
++        group_id: Number(groupId), user_id: Number(qq), no_cache: false,
++      }, 8000);
++      const name = String(info?.card || info?.nickname || '').trim();
++      if (name) groupMemberNames.set(key, { name, at: Date.now() });
++      return name;
++    } catch (error) {
++      log(`member name lookup failed for ${groupId}/${qq}: ${error?.message ?? error}`);
++      return '';
++    }
++  }
 +
 +  function bufferGroupMessage(groupId, text, payload) {
 +    const list = groupBuffers.get(groupId) ?? [];
@@ -166,7 +185,7 @@ index 83d8357..cd8b9e6 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4888,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4907,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -175,7 +194,7 @@ index 83d8357..cd8b9e6 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4910,62 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4929,69 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -183,6 +202,13 @@ index 83d8357..cd8b9e6 100644
 +    let text = extractIncoming(payload.message, selfId).text;
      const carriesImage = messageSegments(payload.message).some((segment) => segment?.type === 'image');
 +    if (isGroup) {
++      // OneBot 的 at 段只有 QQ 号；换成群名片/昵称，否则她会问「@1234567 是谁」。
++      if (/@\d{5,12}/.test(text)) {
++        for (const m of [...text.matchAll(/@(\d{5,12})/g)]) {
++          const name = await resolveMemberName(groupId, m[1]);
++          if (name) text = text.split('@' + m[1]).join('@' + name);
++        }
++      }
 +      // 群聊唤醒层：被叫到 / 跟随窗口内 / 抽中概率才叫醒模型；
 +      // 其余消息只进缓冲，等下次唤醒时作为上下文一起带上，零模型调用。
 +      const atMe = mentionsSelf(payload.message, selfId);
@@ -239,7 +265,7 @@ index 83d8357..cd8b9e6 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6056,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6082,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
