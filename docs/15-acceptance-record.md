@@ -272,3 +272,66 @@ node cli.mjs check   # PASS 75 / FAIL 0（本地链接、索引覆盖均通过�
 | 群聊人设仍是 `feiyu`（私聊版，含「爱我」） | 建议换回 `feiyu-group`，否则群里会说出不合群的话 |
 | 长任务输出仍可能写成科普 | 人设只有「别演一整套」，未约束长度 |
 | 画面感比喻（尾巴、窝）密度偏高 | 风格问题，暂不动 |
+
+---
+
+## 2026-10-28 00:40 · 启动脚本编码 + 配置复现
+
+### 1. 双击 bat「没反应」——两个编码坑叠加
+
+| 文件 | 问题 | 现象 |
+|---|---|---|
+| `tools/一键启动肥鱼.bat` | UTF-8 无 BOM，CMD 按 GBK 解析中文行 | 窗口闪退，什么都没执行 |
+| `tools/start-feiyu.ps1` | 被编辑器保存后**丢了 BOM**，PowerShell 按 GBK 解码中文 | `Unexpected token '{'`，脚本根本没跑起来 |
+
+修复：
+
+- bat 改**纯 ASCII**，输出重定向到 `%TEMP%\feiyu-start.log` 再 `type` 出来
+- ps1 重新以 **UTF-8 with BOM** 保存
+- `Test-Port` 从 `Test-NetConnection`（每次 1–2 秒）换成 `TcpClient`（300ms）
+- 等 NapCat 的循环加进度点
+
+验收：
+
+```powershell
+powershell -File tools/start-feiyu.ps1   # 正常输出，probe ok connected
+cmd /c "tools\一键启动肥鱼.bat"           # exit 0，生成日志
+```
+
+### 2. setup 补上面板参数（复现缺口）
+
+之前 `maxBubbles=2` 只在面板手改过，`setup.mjs` 不知道，别人装会回到默认 3（刷屏）。
+
+`config/defaults.json` 新增 `settings` 段：
+
+```json
+"settings": {
+  "companion": { "maxBubbles": 2 },
+  "memory": { "everyTurns": 40, "maxChars": 1200 },
+  "proactiveCfg": { "startHour": 9, "endHour": 23, "maxPerDay": 3 }
+}
+```
+
+写入规则：**只在首次安装**（`personae` 为空）时写；已配置的机器不覆盖。
+
+### 3. 复制边界（用户确认）
+
+| 会跟着仓库走 | 不会跟（也不该跟） |
+|---|---|
+| 12 处补丁、唤醒参数、人设文本、会话绑定、`maxBubbles`、语音依赖、MCP | QQ/群号、MiniMax Key 与克隆音色、记忆/表情包/会话、NapCat 登录态 |
+
+### 验收
+
+| 项 | 结果 |
+|---|---|
+| `node cli.mjs check` | ✅ PASS 75 / FAIL 0 |
+| `node checks/check-patches.mjs` | ✅ 16/16 |
+| 启动脚本 | ✅ 直接运行与 bat 双击均正常 |
+
+### 教训
+
+Windows 上带中文的 `.bat` / `.ps1` 是**编码雷区**：
+
+- `.bat` 用纯 ASCII 最稳（cmd 的代码页行为和文件编码容易不一致）
+- `.ps1` 必须 UTF-8 **with BOM**，否则 PowerShell 会按系统代码页解码
+- 这两条已写进 [docs/16](16-one-command.md) 的排查表
