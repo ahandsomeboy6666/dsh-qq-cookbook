@@ -11,7 +11,7 @@
 | 10 | [环境就绪](10-onboard-env.md) | D0 | 无 | `node checks/probe-onebot.mjs --json` | ✅ 完成（6700/6701，selfId 3866560965） |
 | 11 | [安装 cheems 并打通回环](11-install-cheems.md) | D1 | 10 | `node checks/check-install.mjs --json` | ✅ 完成（微信私聊已通，owner=632207916） |
 | 12 | [私聊/群聊两套人设](12-persona.md) | D2 | 11 | `node checks/check-persona.mjs` | ✅ 完成（`feiyu` / `feiyu-group`，preset=standard） |
-| 13 | [浏览器能力与 30 元零花钱](13-allowance-browser.md) | D3 | 11 | `node checks/check-budget.mjs` | ✅ 浏览器已通；额度写进人设（插件无额度字段，见 [说明](../docs/14-allowance.md)） |
+| 13 | [浏览器能力与 30 元零花钱](13-allowance-browser.md) | D3 | 11 | `node checks/check-budget.mjs` | ✅ 浏览器已通；额度只靠小号物理上限（不写人设，见 [说明](../docs/14-allowance.md)） |
 
 > 群聊行为不只靠人设：唤醒层（@ / 昵称 / 跟随窗口 / 概率 / 缓冲）是本地补丁，见
 > [本地补丁清单](../docs/12-bridge-patches.md)，升级插件后要重打。
