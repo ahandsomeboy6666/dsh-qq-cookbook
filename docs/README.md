@@ -35,7 +35,8 @@
 | [docs/06-methodology.md](06-methodology.md) | 可复用的 AI 开发范式（回答「其他项目也类似？」） | 已定 |
 | [docs/12-bridge-patches.md](12-bridge-patches.md) | **本地补丁清单**：群聊唤醒层等 5 处 fork 改动、重打步骤、验收命令 | 已生效 |
 | [docs/13-browser-mcp.md](13-browser-mcp.md) | **浏览器能力**：Playwright MCP 安装、`insert` 配置、四个坑与验收 | 已生效 |
-| [docs/14-allowance.md](14-allowance.md) | **30 元零花钱**：插件无额度字段，靠物理上限 + 人设文字 + 无支付工具三层 | 已生效 |
+| [docs/14-allowance.md](14-allowance.md) | **30 元零花钱**：不写人设、不做代码闸门，只靠小号 30 元物理上限 | 已生效 |
+| [docs/15-acceptance-record.md](15-acceptance-record.md) | **验收记录**：每次验收的日期、命令、结果、遗留 | 已定 |
 
 ## 决策记录（ADR）
 
