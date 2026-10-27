@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..a6c5c81 100644
+index 83d8357..96ed1ca 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -139,7 +139,7 @@ index 83d8357..a6c5c81 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4890,50 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4890,62 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -153,7 +153,18 @@ index 83d8357..a6c5c81 100644
 +      const wake = cfg.groupWake;
 +      if (wake) {
 +        const senderId = String(payload.user_id ?? '');
-+        const nickHit = wake.nicknames.some((name) => name !== '' && text.includes(name));
++        // 昵称只有在「像在叫她」时才算：句首称呼，或紧跟呼语。
++        // 「本地肥鱼接入qq」「这肥鱼真有意思」这类只是提到，不接。
++        const trimmed = text.trim();
++        const nickHit = wake.nicknames.some((name) => {
++          if (!name) return false;
++          const at = trimmed.replace(/^@\s*/, '');
++          return at.startsWith(name)
++            || at.startsWith('大' + name)
++            || trimmed.includes(name + '在吗')
++            || trimmed.includes(name + '在不在')
++            || trimmed.includes(name + '你说');
++        });
 +        const onlyImage = text === '' && carriesImage;
 +        // 这条消息在 @ 别人（含 @全体）：是冲别人说的，不该插嘴。
 +        const atOthers = messageSegments(payload.message).some(
@@ -166,6 +177,7 @@ index 83d8357..a6c5c81 100644
 +        let reason = '';
 +        if (atMe) reason = 'at';
 +        else if (nickHit) reason = 'nickname';
++        else if (atOthers) reason = ''; // @ 的是别人，且没叫她：不接
 +        else if (atOthers) reason = ''; // 在跟别人说话，不接
 +        else if (onlyImage) reason = ''; // 表情包/纯图不接，只有点名才理
 +        else if (followed && gap >= 3000) reason = 'follow';
@@ -191,7 +203,7 @@ index 83d8357..a6c5c81 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6024,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6036,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
