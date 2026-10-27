@@ -1,4 +1,4 @@
-# dsh-qq-cookbook
+﻿# dsh-qq-cookbook
 
 把 **DeepSeek Harness（DSH）接入 QQ** 的选型与部署资产：选哪条路、怎么验收、哪些坑已经有人踩过。
 
@@ -124,7 +124,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 当前方案（一页纸） | ✅ 已拍板 |
 | 安全与零花钱授权模型 | ✅ 已定 |
 | 部署任务卡 D0–D3 | ✅ 已写 |
-| 检查脚本（9 个） | ✅ 可运行 |
+| 检查脚本（10 个） | ✅ 可运行 |
 | 环境（NapCat / cheems / 人设） | ✅ 已就绪（2026-10-27） |
 | 本地补丁（群聊唤醒层等） | ✅ 已生效，见 [补丁清单](docs/12-bridge-patches.md) |
 | 浏览器能力（Playwright MCP） | ✅ 已生效，见 [浏览器能力](docs/13-browser-mcp.md) |

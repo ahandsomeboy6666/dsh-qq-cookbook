@@ -110,6 +110,7 @@ node checks/check-patches.mjs
 | 语音配置 | `settings.voice` | ✅ engine=minimax，voiceId=`c4clone001`，key 126 字符，`lastError` 空 |
 | MCP | 进程检查 | ✅ Playwright PID 运行中 |
 | 一键恢复 | `node tools/setup.mjs --dry-run` | ✅ 全 SKIP（幂等），含语音步骤 |
+| 行为回归 | `node checks/check-behavior.mjs` | ✅ 5 项 PASS（语音/提示/标签/连接/唤醒占比） |
 
 ### 行为证据（`bridge.log` 当日累计）
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 一键恢复：把 clone 下来的 cookbook 变成一台能跑的 QQ 桥接。
  *
@@ -403,7 +403,7 @@ function summary() {
     3. 小号只充 30 元，不绑主卡
     4. 在 QQ 里私聊发一句，确认有回复
 
-  验证：node cli.mjs status && node checks/check-patches.mjs
+  验证：node cli.mjs status && node checks/check-patches.mjs && node checks/check-behavior.mjs
 `)
   process.exit(failed.length ? 1 : 0)
 }
