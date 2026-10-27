@@ -322,7 +322,48 @@ if (SKIP_MCP) {
   }
 }
 
-/* 7. NapCat 启动器 */
+/* 7. 语音：装 edge-tts 并开启 sweet 引擎（免费、在线合成） */
+const PYLIB = join(DSH_HOME, 'im-bridge', 'pylib')
+const DSH_PY = join(dshDir, 'resources', 'runtime', 'primary-runtime', 'dependencies', 'python', 'python.exe')
+let voiceSettings = null
+try { voiceSettings = JSON.parse(await readFile(SETTINGS, 'utf8')) } catch { /* 插件没跑过 */ }
+let pythonPath = ''
+for (const cand of [voiceSettings?.voice?.pythonPath, DSH_PY].filter(Boolean)) {
+  if (await exists(cand)) { pythonPath = cand; break }
+}
+if (!pythonPath) {
+  step('语音（edge-tts）', 'SKIP', '没找到 Python，跳过（可改用 sapi）')
+} else {
+  const hasEdge = await exists(join(PYLIB, 'edge_tts'))
+  if (hasEdge) {
+    step('语音（edge-tts）', 'SKIP', '已安装')
+  } else if (DRY) {
+    step('语音（edge-tts）', 'TODO', 'pip install --target pylib edge-tts')
+  } else {
+    const pip = run(pythonPath, ['-m', 'pip', 'install', '--target', PYLIB, 'edge-tts', '-q', '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple'])
+    step('语音（edge-tts）', pip.status === 0 ? 'OK' : 'FAIL', pip.status === 0 ? '已安装' : (pip.stderr || '').slice(0, 140))
+  }
+  if (voiceSettings && !DRY) {
+    const want = {
+      enabled: true,
+      engine: 'sweet',
+      sweetPreset: 'sweet-girl',
+      pythonPath: pythonPath.replaceAll('\\', '/'),
+      pythonLib: PYLIB.replaceAll('\\', '/'),
+    }
+    const cur = voiceSettings.voice ?? {}
+    if (cur.enabled !== true || cur.engine !== 'sweet' || cur.pythonPath !== want.pythonPath) {
+      await backup(SETTINGS)
+      voiceSettings.voice = { ...cur, ...want }
+      await writeFile(SETTINGS, JSON.stringify(voiceSettings, null, 2) + '\n', 'utf8')
+      step('开启语音', 'OK', 'sweet / 晓伊')
+    } else {
+      step('开启语音', 'SKIP', '已开启')
+    }
+  }
+}
+
+/* 8. NapCat 启动器 */
 if (await exists(napcatDir)) {
   if (await exists(napcatLauncher)) {
     step('NapCat 启动器', 'SKIP', 'launcher-user.bat 已存在')

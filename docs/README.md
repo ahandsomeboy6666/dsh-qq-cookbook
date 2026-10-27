@@ -38,6 +38,7 @@
 | [docs/14-allowance.md](14-allowance.md) | **30 元零花钱**：不写人设、不做代码闸门，只靠小号 30 元物理上限 | 已生效 |
 | [docs/15-acceptance-record.md](15-acceptance-record.md) | **验收记录**：每次验收的日期、命令、结果、遗留 | 已定 |
 | [docs/16-one-command.md](16-one-command.md) | **一个命令恢复**：`tools/setup.mjs` 做什么、不做什么、边界与排查 | 已定 |
+| [docs/17-voice.md](17-voice.md) | **语音（TTS）**：四个引擎、edge-tts 装法、三个坑与验收 | 已生效 |
 
 ## 决策记录（ADR）
 
