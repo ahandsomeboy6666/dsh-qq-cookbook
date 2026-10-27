@@ -95,3 +95,5 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 | 群里用私聊性格 | 群没绑人设 | 重跑 setup（会自动绑 `group:<群>`） |
 | MCP 没起来 | 全局装失败 | `npm i -g @playwright/mcp`，或 `--skip-mcp` |
 | NapCat 起不来 | 没装或没扫码 | `tools/napcat` 下跑 `NapCatInstaller.exe`，再 `napcat.quick.bat` |
+| **双击 bat 闪退/没反应** | bat 是 UTF-8 但 cmd 按 GBK 读，中文行语法错；或 ps1 丢了 BOM | bat 用纯 ASCII；ps1 必须 UTF-8 **带 BOM**；双击日志在 `%TEMP%\feiyu-start.log` |
+| 启动脚本报 `Unexpected token '{'` | ps1 被编辑器改成无 BOM，PowerShell 按 GBK 解码中文 | 重新以 UTF-8 with BOM 保存 ps1 |

@@ -8,9 +8,14 @@ $dshCandidates = @('E:\dsh桌面端\DeepSeek Harness.exe','C:\Program Files\Deep
 $dshExe = $dshCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 function Test-Port([int]$port) {
+  # Test-NetConnection 每次要 1-2 秒；直接用 TcpClient，300ms 超时。
+  $client = New-Object System.Net.Sockets.TcpClient
   try {
-    return [bool](Test-NetConnection -ComputerName 127.0.0.1 -Port $port -InformationLevel Quiet -WarningAction SilentlyContinue)
-  } catch { return $false }
+    $iar = $client.BeginConnect('127.0.0.1', $port, $null, $null)
+    if (-not $iar.AsyncWaitHandle.WaitOne(300)) { return $false }
+    $client.EndConnect($iar)
+    return $true
+  } catch { return $false } finally { $client.Close() }
 }
 
 function Test-DshRunning {
@@ -46,9 +51,11 @@ if (Test-Port 6700) {
   } else {
     Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$napcatQuick`"" -WorkingDirectory $napcatDir
     $ready = $false
-    for ($i = 0; $i -lt 45; $i++) {
-      Start-Sleep -Seconds 2
+    Write-Host ' 等待端口…' -NoNewline
+    for ($i = 0; $i -lt 90; $i++) {
+      Start-Sleep -Seconds 1
       if (Test-Port 6700) { $ready = $true; break }
+      if ($i -gt 0 -and $i % 15 -eq 0) { Write-Host '.' -NoNewline }
     }
     if ($ready) { Write-Host '  ok 已启动' -ForegroundColor Green }
     else {
