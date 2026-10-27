@@ -37,6 +37,7 @@ const PATCHES = [
   ['P8 @别人时不插嘴', '在跟别人说话，不接'],
   ['P9 昵称只在像叫她时算', '像在叫她'],
   ['P10 群聊放行只读联网', 'group allowed read-only web tool'],
+  ['P11 群聊 guard 放行联网', '群里只开放只读联网查询'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 

@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..135dca0 100644
+index 83d8357..cd8b9e6 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -35,7 +35,30 @@ index 83d8357..135dca0 100644
      cwd: str(config.cwd, process.cwd()),
      agentPreset: str(config.agentPreset, ''),
      model: normalizeModel(config.model),
-@@ -867,6 +886,12 @@ export function apply(ctx, rawConfig) {
+@@ -846,7 +865,21 @@ export function apply(ctx, rawConfig) {
+     if(installed)for(const dispose of installed.cleanups)dispose?.();
+     const scope=agent.ctx,cleanups=[];let persona=false;
+     const tools=scope?.get?.('tools'),systemPrompt=scope?.get?.('systemPrompt');
+-    if(typeof tools?.guard==='function') cleanups.push(tools.guard(()=>currentOwnerToolDenial(chat)));
++    if(typeof tools?.guard==='function') {
++      if (chat.kind === 'group') {
++        // 群聊默认被 ownerToolDenial 一刀切（kind !== 'private' 即拒）。
++        // 这里只放开只读联网：web_search / web_fetch，其余照旧拒绝。
++        cleanups.push(tools.guard((execution) => {
++          if (stopped || accountPaused) return 'QQ 桥接已暂停，当前任务不再执行工具。';
++          const toolName = String(execution?.name ?? '');
++          return /^(web_search|web_fetch|websearch|webfetch)$/i.test(toolName)
++            ? undefined
++            : '群里只开放只读联网查询，其他操作不可用。';
++        }));
++      } else {
++        cleanups.push(tools.guard(()=>currentOwnerToolDenial(chat)));
++      }
++    }
+     else if(chat.isOwner)throw Error('DSH 会话工具权限接口不可用');
+     if(typeof systemPrompt?.section==='function'&&sessionInstructions.has(sessionId)){
+       cleanups.push(systemPrompt.section({name:'deployment:persona-prefix',order:systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),text:instructions,interpolate:false}));
+@@ -867,6 +900,12 @@ export function apply(ctx, rawConfig) {
        log(`owner authorized tool approval for "${request.toolName}" in ${agent.id}`);
        return 'allowed-once';
      }
@@ -48,7 +71,7 @@ index 83d8357..135dca0 100644
      log(`auto-rejected approval for "${request.toolName}" in ${agent.id}`);
      return 'rejected';
    });
-@@ -2415,7 +2440,18 @@ export function apply(ctx, rawConfig) {
+@@ -2415,7 +2454,18 @@ export function apply(ctx, rawConfig) {
     */
    function burstSegments(burst, chat) {
      const segments = [];
@@ -68,7 +91,7 @@ index 83d8357..135dca0 100644
      const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
      let cursor = 0;
      let match;
-@@ -4246,6 +4282,18 @@ export function apply(ctx, rawConfig) {
+@@ -4246,6 +4296,18 @@ export function apply(ctx, rawConfig) {
          // a successful render it degrades to plain text instead of vanishing.
          let voiceFile = null;
          let voiceShare=null;
@@ -87,7 +110,7 @@ index 83d8357..135dca0 100644
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4532,7 +4580,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4594,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -98,7 +121,7 @@ index 83d8357..135dca0 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4699,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4713,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -107,7 +130,7 @@ index 83d8357..135dca0 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4810,35 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4824,35 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -143,7 +166,7 @@ index 83d8357..135dca0 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4874,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4888,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -152,7 +175,7 @@ index 83d8357..135dca0 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4896,62 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4910,62 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -216,7 +239,7 @@ index 83d8357..135dca0 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6042,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6056,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
