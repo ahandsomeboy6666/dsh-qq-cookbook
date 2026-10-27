@@ -335,3 +335,48 @@ Windows 上带中文的 `.bat` / `.ps1` 是**编码雷区**：
 - `.bat` 用纯 ASCII 最稳（cmd 的代码页行为和文件编码容易不一致）
 - `.ps1` 必须 UTF-8 **with BOM**，否则 PowerShell 会按系统代码页解码
 - 这两条已写进 [docs/16](16-one-command.md) 的排查表
+
+---
+
+## 2026-10-28 00:35 · 搜索 402 → 改用 API key
+
+### 现象
+
+群聊里让她查实时信息，报：
+
+```
+DeepSeek API error (HTTP 402): Insufficient Balance
+endpoint: https://api.deepseek.com/anthropic/v1/messages
+```
+
+但 DeepSeek 平台显示**余额 ¥17.86**，且 30 天消费 ¥474，账户正常。
+
+### 排查
+
+| 步骤 | 结果 |
+|---|---|
+| 核对账号 | 平台手机号 `173*****53` = DSH 登录手机号，**同一个账号** |
+| 清点凭据 | `~/.dsh/.credentials.yaml` 里是 `deepseek-account-platform/*`（账号登录态） |
+| API key 直调（不带工具） | **200** |
+| API key 直调（带 `web_search` 工具） | **200**，返回 `server_tool_use: web_search` |
+
+结论：**账号登录态 token 不能用于搜索端点**（会 402），API key 可以。余额没问题。
+
+### 修复
+
+`~/.dsh/profiles/desktop/cordis.patch.yml` 给搜索提供方配字面值 key：
+
+```yaml
+- id: web-search-deepseek
+  name: '@deepseek-ai/dsh-web-search-deepseek'
+  config:
+    apiKey: 'sk-...'        # 只存本机，不入库
+```
+
+热重载后，DSH 内 `web_search` 返回真实结果，验证通过。
+
+### 注意
+
+- **key 只写在 `~/.dsh` 的本地配置里**，不进仓库、不进文档
+- 插件文档说「账号 token 优先于 apiKey」，但实测配了 `apiKey` 后搜索恢复正常；说明该端点解析账号 token 失败时会回退到 key
+- 平台上那条横幅写明：搜索按次收费将于 **2026-11-01** 开始，目前只计模型 token
