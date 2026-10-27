@@ -12,7 +12,7 @@
   },
   "groupWake": {
     "probability": 0.1,
-    "followMinutes": 0,
+    "followMinutes": 0.5,
     "bufferSize": 200,
     "recentLimit": 8,
     "nicknames": ["肥鱼", "大肥鱼"]
