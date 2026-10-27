@@ -6,7 +6,7 @@
  *   node checks/probe-dsh.mjs                    # 人读摘要
  *   node checks/probe-dsh.mjs --json             # 机读 JSON
  *   node checks/probe-dsh.mjs --dsh-url http://127.0.0.1:3080
- *   node checks/probe-dsh.mjs --onebot-url http://127.0.0.1:3000
+ *   node checks/probe-dsh.mjs --onebot-url http://127.0.0.1:6700
  *
  * 退出码：0 = 关键项可判定；1 = 脚本自身失败。
  * 注意：连不上不是脚本失败——它只负责「报告事实」。
@@ -27,7 +27,7 @@ const DSH_URL_ARG = opt('--dsh-url') ?? process.env.DSH_URL
 const DSH_URLS = DSH_URL_ARG
   ? [DSH_URL_ARG]
   : ['http://127.0.0.1:3080', 'http://127.0.0.1:50460']
-const ONEBOT_URL = opt('--onebot-url') ?? process.env.ONEBOT_URL ?? 'http://127.0.0.1:3000'
+const ONEBOT_URL = opt('--onebot-url') ?? process.env.ONEBOT_URL ?? 'http://127.0.0.1:6700'
 const DSH_HOME = process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh')
 
 async function safeStat(p) {

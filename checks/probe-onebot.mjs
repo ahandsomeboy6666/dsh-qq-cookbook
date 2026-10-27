@@ -5,7 +5,7 @@
  * 用法：
  *   node checks/probe-onebot.mjs
  *   node checks/probe-onebot.mjs --json
- *   node checks/probe-onebot.mjs --url http://127.0.0.1:3000 --token xxx
+ *   node checks/probe-onebot.mjs --url http://127.0.0.1:6700 --token xxx
  *
  * 退出码：0 = 探测完成（连不上也返回 0，只报告事实）；1 = 参数错误。
  */
@@ -17,7 +17,7 @@ const opt = (name) => {
   return i >= 0 ? args[i + 1] : undefined
 }
 
-const URL_BASE = (opt('--url') ?? process.env.ONEBOT_URL ?? 'http://127.0.0.1:3000').replace(/\/+$/, '')
+const URL_BASE = (opt('--url') ?? process.env.ONEBOT_URL ?? 'http://127.0.0.1:6700').replace(/\/+$/, '')
 const TOKEN = opt('--token') ?? process.env.ONEBOT_TOKEN ?? ''
 
 async function call(path) {
@@ -49,7 +49,7 @@ const out = {
 }
 
 if (!out.connected) {
-  out.hint = '检查：NapCat 是否启动、HTTP API 端口是否 3000（不是 WS 的 3001）、accessToken 是否一致'
+  out.hint = '检查：NapCat 是否启动、HTTP API 端口是否 6700（不是 WS 的 6701）、accessToken 是否一致'
 }
 
 if (JSON_MODE) {

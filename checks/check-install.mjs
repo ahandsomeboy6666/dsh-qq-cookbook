@@ -56,7 +56,7 @@ const todo = installed
   : [
       `把 cheems 仓库挂到 profile：dsh plugin --profile ${target} add <cheems 仓库路径>`,
       `重启 DSH，打开 设置 → QQ 桥接`,
-      `填 wsUrl（NapCat WebSocket，默认 ws://127.0.0.1:3001）与 accessToken`,
+      `填 wsUrl（NapCat WebSocket，默认 ws://127.0.0.1:6701）与 accessToken`,
       `白名单加自己的 QQ 号，设为号主`
     ]
 

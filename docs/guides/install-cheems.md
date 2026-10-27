@@ -7,8 +7,8 @@
 ## 前置（只有人能做的部分）
 
 1. 装 NapCat，扫码登录 QQ 小号。
-2. NapCat 里开启 **WebSocket 服务端**（默认端口 `3001`），记下 token（没设就留空）。
-3. 确认 `ws://127.0.0.1:3001` 能被本机访问。
+2. NapCat 里开启 **WebSocket 服务端**（默认端口 `6701`），记下 token（没设就留空）。
+3. 确认 `ws://127.0.0.1:6701` 能被本机访问。
 
 ## 安装
 
@@ -34,7 +34,7 @@ dsh plugin --profile desktop add C:\path\to\dsh-qq-bridge
 
 | 字段 | 值 | 说明 |
 |---|---|---|
-| `wsUrl` | `ws://127.0.0.1:3001` | NapCat 的 WS 服务端，不是 HTTP |
+| `wsUrl` | `ws://127.0.0.1:6701` | NapCat 的 WS 服务端，不是 HTTP |
 | `accessToken` | NapCat 里设的 token | 没设就留空 |
 | `allowUsers` | `["你的QQ号"]` | 留空 = 谁都不理 |
 | `allowGroups` | `["群号"]` | 留空 = 不响应群 |
