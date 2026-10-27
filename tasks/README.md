@@ -8,9 +8,9 @@
 
 | # | 任务 | 阶段 | 依赖 | 验收命令 | 状态 |
 |---|---|---|---|---|---|
-| 10 | [环境就绪](10-onboard-env.md) | D0 | 无 | `node checks/probe-onebot.mjs --json` | 📋 待做 |
-| 11 | [安装 cheems 并打通回环](11-install-cheems.md) | D1 | 10 | `node checks/check-install.mjs --json` | 📋 待做 |
-| 12 | [私聊/群聊两套人设](12-persona.md) | D2 | 11 | `node checks/check-persona.mjs` | 📋 待做 |
+| 10 | [环境就绪](10-onboard-env.md) | D0 | 无 | `node checks/probe-onebot.mjs --json` | ✅ 完成（6700/6701，selfId 3866560965） |
+| 11 | [安装 cheems 并打通回环](11-install-cheems.md) | D1 | 10 | `node checks/check-install.mjs --json` | ✅ 完成（微信私聊已通，owner=632207916） |
+| 12 | [私聊/群聊两套人设](12-persona.md) | D2 | 11 | `node checks/check-persona.mjs` | 🟡 进行中（roles 已写，面板未配） |
 | 13 | [浏览器能力与 30 元零花钱](13-allowance-browser.md) | D3 | 11 | `node checks/check-budget.mjs` | 📋 待做 |
 
 ## 建议顺序

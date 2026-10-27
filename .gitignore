@@ -16,3 +16,9 @@ config.json
 *.bak
 .DS_Store
 Thumbs.db
+
+# 本地 NapCat（1.4GB，不进仓库）
+tools/napcat/
+
+# 本地安装的 cheems 源码（11MB，不进仓库）
+vendor/dsh-im-bridge/

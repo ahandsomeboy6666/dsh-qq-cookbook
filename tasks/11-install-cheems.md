@@ -13,7 +13,7 @@ cheems 插件加载，QQ 私聊发消息能收到回复。
 
 ## 输出
 
-- profile 注册：`dsh plugin --profile desktop add github:cheems135/dsh-qq-bridge`（或本地路径）
+- 桌面端「设置 → 插件 → 添加插件」填 `E:\workspace\dsh-qq-cookbook\vendor\dsh-im-bridge`
 - 设置页出现「QQ 桥接」
 - `~/.dsh/profiles/desktop/settings.json` 的 `im-bridge` 段填好 `wsUrl` / `accessToken` / `allowUsers` / `allowGroups`
 

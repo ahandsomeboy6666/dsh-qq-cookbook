@@ -12,21 +12,11 @@
 
 ## 安装
 
-二选一。
+> 桌面端 profile 由 Electron 独占，CLI 会报 `profile "desktop" is managed exclusively by the Electron application`。必须用**桌面端界面**安装。
 
-**方式 A：从 GitHub 装**
-
-```powershell
-dsh plugin --profile desktop add github:cheems135/dsh-qq-bridge
-```
-
-**方式 B：从本地路径装**（已 clone 时）
-
-```powershell
-dsh plugin --profile desktop add C:\path\to\dsh-qq-bridge
-```
-
-装完**重启 DSH 桌面端**，插件与设置页只在启动时加载。
+1. 打开 DSH 桌面端 → **设置 → 插件 → 添加插件**
+2. 填本地路径：`E:\workspace\dsh-qq-cookbook\vendor\dsh-im-bridge`（或 GitHub URL `https://github.com/cheems135/dsh-qq-bridge`）
+3. 确认安装，然后**重启 DSH 桌面端**（插件与设置页只在启动时加载）。
 
 ## 配置
 
