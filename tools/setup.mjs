@@ -14,8 +14,9 @@
  *   2. 把 QQ 号填进白名单（默认值已写，改人/换号时才需要）
  *   3. 小号只充 30 元
  */
-import { readFile, writeFile, copyFile, readdir, mkdir, access } from 'node:fs/promises'
+import { readFile, writeFile, copyFile, readdir, mkdir, access, open } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +25,9 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run')
 const SKIP_MCP = args.includes('--skip-mcp')
+const NO_DOWNLOAD = args.includes('--no-download')
+// 桌面端官方更新源（来自已安装的 resources/app-update.yml）
+const DSH_FEED = 'https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml'
 const opt = (name, fallback) => {
   const i = args.indexOf(name)
   return i >= 0 ? args[i + 1] : fallback
@@ -48,6 +52,51 @@ function step(name, status, detail = '') {
   console.log(`  [${status}] ${name}${detail ? '  ' + detail : ''}`)
 }
 async function exists(p) { try { await access(p); return true } catch { return false } }
+
+// 设了 DSH_DESKTOP_DIR 就只认它（方便多安装路径 / 测试未安装分支）
+const DSH_CANDIDATES = process.env.DSH_DESKTOP_DIR
+  ? [process.env.DSH_DESKTOP_DIR]
+  : [
+      'E:\\dsh桌面端',
+      process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'DeepSeek Harness') : '',
+      process.env.ProgramFiles ? join(process.env.ProgramFiles, 'DeepSeek Harness') : '',
+      process.env['ProgramFiles(x86)'] ? join(process.env['ProgramFiles(x86)'], 'DeepSeek Harness') : '',
+    ].filter(Boolean)
+
+/** 找已安装的桌面端目录；找不到返回空串 */
+async function findDsh() {
+  for (const dir of DSH_CANDIDATES) {
+    if (await exists(join(dir, 'DeepSeek Harness.exe'))) return dir
+    if (await exists(join(dir, 'resources', 'app-update.yml'))) return dir
+  }
+  return ''
+}
+
+/** 从官方 feed 下载安装包并校验 sha512；已下载过则直接复用 */
+async function downloadDshInstaller() {
+  const res = await fetch(DSH_FEED, { signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error('更新源不可用 HTTP ' + res.status)
+  const text = await res.text()
+  const url = (text.match(/https:\/\/\S+\.exe/) ?? [])[0]
+  const sha = (text.match(/sha512:\s*>?-\s*\n\s*([A-Za-z0-9+/=]+)/) ?? text.match(/sha512:\s*([A-Za-z0-9+/=]+)/) ?? [])[1]
+  const version = (text.match(/^version:\s*(\S+)/m) ?? [])[1] ?? 'latest'
+  if (!url) throw new Error('清单里没有安装包地址')
+  const name = url.split('/').pop()
+  const dir = join(ROOT, 'tools', 'downloads')
+  await mkdir(dir, { recursive: true })
+  const dest = join(dir, name)
+  if (await exists(dest)) return { dest, version, cached: true, verified: Boolean(sha) }
+  const file = await fetch(url)
+  if (!file.ok || !file.body) throw new Error('下载失败 HTTP ' + file.status)
+  const fh = await open(dest, 'w')
+  const hash = createHash('sha512')
+  let bytes = 0
+  for await (const chunk of file.body) { hash.update(chunk); await fh.write(chunk); bytes += chunk.length }
+  await fh.close()
+  const actual = hash.digest('base64')
+  return { dest, version, bytes, verified: Boolean(sha) && actual === sha, shaMismatch: Boolean(sha) && actual !== sha }
+}
+
 function run(cmd, argv, cwd) {
   // Windows 下 npm/npx 是 .cmd，spawnSync 必须走 shell 才能执行
   return spawnSync(cmd, argv, { cwd, encoding: 'utf8', windowsHide: true, timeout: 180000, shell: process.platform === 'win32' })
@@ -67,8 +116,30 @@ console.log('')
 /* 1. 前置检查 */
 const nodeMajor = Number(process.versions.node.split('.')[0])
 step('Node ≥ 22', nodeMajor >= 22 ? 'OK' : 'FAIL', `v${process.versions.node}`)
+
+const dshDir = await findDsh()
+if (dshDir) {
+  step('DSH 桌面端', 'OK', dshDir)
+} else {
+  step('DSH 桌面端', 'FAIL', '未安装')
+  if (NO_DOWNLOAD) {
+    console.log(`\n  官方安装包：${DSH_FEED}（清单里的 exe 链接可直接下）`)
+  } else {
+    try {
+      console.log('\n  正在从官方源下载安装包（约 290MB，可能较慢）…')
+      const got = await downloadDshInstaller()
+      step('下载 DSH 安装包', got.shaMismatch ? 'FAIL' : 'OK',
+        `${got.dest}${got.verified ? '（sha512 校验通过）' : got.cached ? '（已存在）' : '（未校验）'}`)
+    } catch (error) {
+      step('下载 DSH 安装包', 'FAIL', String(error?.message ?? error).slice(0, 160))
+    }
+  }
+  console.log('\n  装好 DSH 并启动一次，然后重跑：node tools/setup.mjs\n')
+  summary(); process.exit(1)
+}
+
 if (!(await exists(PROFILE))) {
-  step('DSH desktop profile', 'FAIL', `找不到 ${PROFILE}，先安装并启动一次 DSH 桌面端`)
+  step('DSH desktop profile', 'FAIL', `找不到 ${PROFILE}，先启动一次 DSH 再重跑`)
   summary(); process.exit(1)
 }
 step('DSH desktop profile', 'OK', PROFILE)
