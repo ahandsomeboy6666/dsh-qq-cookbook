@@ -19,6 +19,19 @@
 
 体验评分见 [评分卡](docs/references/experience-scorecard.md)，生态调研见 [prior art](docs/references/prior-art.md)。
 
+## 从零恢复（一条命令）
+
+```powershell
+git clone https://github.com/ahandsomeboy6666/dsh-qq-cookbook.git
+cd dsh-qq-cookbook
+node tools/setup.mjs
+```
+
+自动完成：clone 插件并打补丁 → 注册到 desktop profile → 写 `cordis.patch.yml` → 写两套人设 → 装 Playwright MCP → 补 NapCat 启动器。
+之后只剩三件人工：**启动 NapCat 扫码、重启 DSH、小号只充 30 元**。
+
+细节与边界见 [一个命令恢复](docs/16-one-command.md)。
+
 ## 一键启动（日常）
 
 双击 `tools\一键启动肥鱼.bat`：自动检查并启动 NapCat、DSH，再验证桥接是否连上。

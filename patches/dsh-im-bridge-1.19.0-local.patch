@@ -1,0 +1,152 @@
+diff --git a/index.js b/index.js
+index 83d8357..76c5e91 100644
+--- a/index.js
++++ b/index.js
+@@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
+   };
+ }
+ 
++/** `groupWake: {...}` — 群聊唤醒策略：@/昵称/跟随窗口/概率，其余只记录不调模型。 */
++function normalizeGroupWake(value) {
++  if (!value || typeof value !== 'object' || value.enabled === false) return null;
++  const clamp = (input, fallback, min, max) => {
++    const number = Number(input);
++    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
++  };
++  const nicknames = strList(value.nicknames);
++  return {
++    probability: clamp(value.probability, 0.05, 0, 1),
++    followMinutes: clamp(value.followMinutes, 5, 0, 60),
++    bufferSize: Math.floor(clamp(value.bufferSize, 200, 10, 1000)),
++    recentLimit: Math.floor(clamp(value.recentLimit, 8, 1, 50)),
++    nicknames: nicknames.length ? nicknames : ['肥鱼', '大肥鱼'],
++  };
++}
++
+ /** `model: { provider, model, reasoningEffort }` — the Session-local route. */
+ function normalizeModel(value) {
+   if (!value || typeof value !== 'object') return null;
+@@ -167,6 +184,8 @@ function normalizeConfig(raw) {
+     allowUsers: strList(config.allowUsers),
+     allowGroups: strList(config.allowGroups),
+     groupRequireAt: config.groupRequireAt !== false,
++    groupReplyAt: config.groupReplyAt === true,
++    groupWake: normalizeGroupWake(config.groupWake),
+     cwd: str(config.cwd, process.cwd()),
+     agentPreset: str(config.agentPreset, ''),
+     model: normalizeModel(config.model),
+@@ -2415,7 +2434,11 @@ export function apply(ctx, rawConfig) {
+    */
+   function burstSegments(burst, chat) {
+     const segments = [];
+-    if (chat.kind === 'group' && chat.userId) segments.push({ type: 'at', data: { qq: String(chat.userId) } });
++    if (chat.kind === 'group' && chat.userId && cfg.groupReplyAt === true) segments.push({ type: 'at', data: { qq: String(chat.userId) } });
++    // 群聊默认不 @ 人；模型有时会自己模仿出「@某人 」，也一并剥掉。
++    if (chat.kind === 'group' && cfg.groupReplyAt !== true) {
++      burst = burst.replace(/^\s*@[^\s，,：:]{1,20}[ 　]*(?=\S)/, '');
++    }
+     const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
+     let cursor = 0;
+     let match;
+@@ -4532,7 +4555,9 @@ export function apply(ctx, rawConfig) {
+       const request = { cwd: workspace };
+       // A character's voice must not select the old tool-free chat composition.
+       if (chat.isOwner === true) request.agentPreset = 'standard';
+-      else if (persona.preset !== '') request.agentPreset = persona.preset;
++      // 'whale' 是内置角色 id，不是 DSH 的 agent preset（本机只有 standard/ptc/minimal/cordis）。
++      // 群里带过来的 whale 会让 create 直接抛「Unknown agent preset」，所以这里跳过。
++      else if (persona.preset !== '' && persona.preset !== 'whale') request.agentPreset = persona.preset;
+       const created = await ctx.sessionController.create(request);
+       state.chats[chat.key] = {
+         sessionId: created.sessionId,
+@@ -4760,6 +4785,34 @@ export function apply(ctx, rawConfig) {
+     chats.set(sessionId, chat);
+   }
+ 
++  /* ---------------- 群聊唤醒（潜水 + 概率插话） ---------------- */
++
++  const groupBuffers = new Map(); // groupId -> [{ at, sender, text }]
++  const groupFollowUntil = new Map(); // groupId -> 时间戳：唤醒后的跟随窗口
++  const groupLastWake = new Map(); // groupId -> 上次开口时间（防连珠炮）
++
++  function bufferGroupMessage(groupId, text, payload) {
++    const list = groupBuffers.get(groupId) ?? [];
++    const sender = payload?.sender?.card || payload?.sender?.nickname || String(payload?.user_id ?? '');
++    list.push({ at: Date.now(), sender, text: text === '' ? '（没说话）' : text });
++    const limit = cfg.groupWake?.bufferSize ?? 200;
++    while (list.length > limit) list.shift();
++    groupBuffers.set(groupId, list);
++    log(`group ${groupId} ambient: buffered ${list.length}`);
++  }
++
++  function takeGroupContext(groupId) {
++    const list = groupBuffers.get(groupId) ?? [];
++    if (list.length === 0) return '';
++    const recent = list.slice(-(cfg.groupWake?.recentLimit ?? 8));
++    const omitted = list.length - recent.length;
++    const head = omitted > 0 ? (omitted > 99 ? '（更早的大量消息已省略）' : `（更早的 ${omitted} 条已省略）`) : '';
++    groupBuffers.delete(groupId);
++    return ['[群里最近的消息]', head, ...recent.map((item) => `${item.sender}: ${item.text}`), '[记录结束]']
++      .filter((line) => line !== '')
++      .join('\n');
++  }
++
+   /* ---------------- inbound ---------------- */
+ 
+   async function handlePayloadCore(payload) {
+@@ -4795,7 +4848,7 @@ export function apply(ctx, rawConfig) {
+         log(`denied group ${groupId}`);
+         return;
+       }
+-      if (cfg.groupRequireAt && !mentionsSelf(payload.message, selfId)) return;
++      // 唤醒判定挪到下面算完正文之后：判「昵称命中」需要 text。
+     } else if (!effectiveUsers().includes(userId)) {
+       log(`denied private user ${userId}`);
+       const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
+@@ -4817,8 +4870,36 @@ export function apply(ctx, rawConfig) {
+     };
+     const activeChat=chats.get(state.chats[key]?.sessionId);
+     if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
+-    const text = extractIncoming(payload.message, selfId).text;
++    let text = extractIncoming(payload.message, selfId).text;
+     const carriesImage = messageSegments(payload.message).some((segment) => segment?.type === 'image');
++    if (isGroup) {
++      // 群聊唤醒层：被叫到 / 跟随窗口内 / 抽中概率才叫醒模型；
++      // 其余消息只进缓冲，等下次唤醒时作为上下文一起带上，零模型调用。
++      const atMe = mentionsSelf(payload.message, selfId);
++      const wake = cfg.groupWake;
++      if (wake) {
++        const nickHit = wake.nicknames.some((name) => name !== '' && text.includes(name));
++        const followed = (groupFollowUntil.get(groupId) ?? 0) > Date.now();
++        const gap = Date.now() - (groupLastWake.get(groupId) ?? 0);
++        // 非点名时：跟随窗口内只挡 8 秒（正在对话，该接就接）；
++        // 窗口外挡 25 秒，并且还要抽中概率。
++        if (!atMe && !nickHit) {
++          const skip = followed ? gap < 3000 : gap < 25000 || Math.random() >= wake.probability;
++          if (skip) {
++            bufferGroupMessage(groupId, text, payload);
++            return;
++          }
++        }
++        const context = takeGroupContext(groupId);
++        const spoken = text === '' && !carriesImage ? '（只 @ 了你，没说话）' : text;
++        text = context === '' ? spoken : `${context}\n${spoken}`;
++        groupLastWake.set(groupId, Date.now());
++        if (wake.followMinutes > 0) groupFollowUntil.set(groupId, Date.now() + wake.followMinutes * 60000);
++        log(`group ${groupId} wake: ${atMe ? 'at' : nickHit ? 'nickname' : followed ? 'follow' : 'probability'}`);
++      } else if (cfg.groupRequireAt && !atMe) {
++        return;
++      }
++    }
+     if (text === '' && !carriesImage) return;
+ 
+     if (text === '/new' || text === '／new' || text === '/reset') {
+@@ -5909,7 +5990,7 @@ export function apply(ctx, rawConfig) {
+     if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
+     const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
+     const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
+-    if(!sessionId){const cwd=join(chatWorkspaceRoot,'learning');mkdirSync(cwd,{recursive:true});const created=await ctx.sessionController.create({cwd,agentPreset:'whale'});sessionId=created.sessionId;learningSearchSessions.set(scope,sessionId);try{await ctx.sessionController.rename({sessionId,title:'QQ 学习资料检索（不发送聊天）'});}catch{}await configureModel(sessionId,meta.key);}
++    if(!sessionId){const cwd=join(chatWorkspaceRoot,'learning');mkdirSync(cwd,{recursive:true});const created=await ctx.sessionController.create({cwd,agentPreset:'standard'});sessionId=created.sessionId;learningSearchSessions.set(scope,sessionId);try{await ctx.sessionController.rename({sessionId,title:'QQ 学习资料检索（不发送聊天）'});}catch{}await configureModel(sessionId,meta.key);}
+     let agent=agents?.get?.(sessionId);if(!agent&&typeof ctx.sessionController.resolveAgent==='function'){const resolved=await ctx.sessionController.resolveAgent(sessionId);agent=resolved?.agent||agents?.get?.(sessionId);}
+     if(agent&&typeof agents?.withInitiator==='function')return agents.withInitiator(agent,()=>host.search({query}));
+     return host.search({query});
