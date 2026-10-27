@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..76c5e91 100644
+index 83d8357..f1a03c4 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -59,7 +59,7 @@ index 83d8357..76c5e91 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4760,6 +4785,34 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4785,35 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -68,6 +68,7 @@ index 83d8357..76c5e91 100644
 +  const groupBuffers = new Map(); // groupId -> [{ at, sender, text }]
 +  const groupFollowUntil = new Map(); // groupId -> 时间戳：唤醒后的跟随窗口
 +  const groupLastWake = new Map(); // groupId -> 上次开口时间（防连珠炮）
++  const groupWakeSender = new Map(); // groupId -> 上次「主动找她说话」的人
 +
 +  function bufferGroupMessage(groupId, text, payload) {
 +    const list = groupBuffers.get(groupId) ?? [];
@@ -94,7 +95,7 @@ index 83d8357..76c5e91 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4848,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4849,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -103,7 +104,7 @@ index 83d8357..76c5e91 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4870,36 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4871,45 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -116,24 +117,33 @@ index 83d8357..76c5e91 100644
 +      const atMe = mentionsSelf(payload.message, selfId);
 +      const wake = cfg.groupWake;
 +      if (wake) {
++        const senderId = String(payload.user_id ?? '');
 +        const nickHit = wake.nicknames.some((name) => name !== '' && text.includes(name));
-+        const followed = (groupFollowUntil.get(groupId) ?? 0) > Date.now();
++        const onlyImage = text === '' && carriesImage;
++        const sameSpeaker = groupWakeSender.get(groupId) === senderId;
++        // 跟随窗口只对「上次主动找她说话的那个人」有效，且 follow 本身不续期。
++        const followed = sameSpeaker && (groupFollowUntil.get(groupId) ?? 0) > Date.now();
 +        const gap = Date.now() - (groupLastWake.get(groupId) ?? 0);
-+        // 非点名时：跟随窗口内只挡 8 秒（正在对话，该接就接）；
-+        // 窗口外挡 25 秒，并且还要抽中概率。
-+        if (!atMe && !nickHit) {
-+          const skip = followed ? gap < 3000 : gap < 25000 || Math.random() >= wake.probability;
-+          if (skip) {
-+            bufferGroupMessage(groupId, text, payload);
-+            return;
-+          }
++        let reason = '';
++        if (atMe) reason = 'at';
++        else if (nickHit) reason = 'nickname';
++        else if (onlyImage) reason = ''; // 表情包/纯图不接，只有点名才理
++        else if (followed && gap >= 3000) reason = 'follow';
++        else if (gap >= 25000 && Math.random() < wake.probability) reason = 'probability';
++        if (reason === '') {
++          bufferGroupMessage(groupId, text, payload);
++          return;
 +        }
 +        const context = takeGroupContext(groupId);
 +        const spoken = text === '' && !carriesImage ? '（只 @ 了你，没说话）' : text;
 +        text = context === '' ? spoken : `${context}\n${spoken}`;
 +        groupLastWake.set(groupId, Date.now());
-+        if (wake.followMinutes > 0) groupFollowUntil.set(groupId, Date.now() + wake.followMinutes * 60000);
-+        log(`group ${groupId} wake: ${atMe ? 'at' : nickHit ? 'nickname' : followed ? 'follow' : 'probability'}`);
++        // 只有被点名/叫到/抽中概率才开（或续）窗口；follow 不续期，避免自我续命。
++        if (reason !== 'follow') {
++          groupWakeSender.set(groupId, senderId);
++          if (wake.followMinutes > 0) groupFollowUntil.set(groupId, Date.now() + wake.followMinutes * 60000);
++        }
++        log(`group ${groupId} wake: ${reason}`);
 +      } else if (cfg.groupRequireAt && !atMe) {
 +        return;
 +      }
@@ -141,7 +151,7 @@ index 83d8357..76c5e91 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +5990,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6000,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
