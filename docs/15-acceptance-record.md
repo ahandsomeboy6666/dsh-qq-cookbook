@@ -207,3 +207,68 @@ node cli.mjs check   # PASS 75 / FAIL 0（本地链接、索引覆盖均通过�
 ### 边界声明
 
 这份手册能保证「AI 照着做不会跑偏」，但不能让扫码变自动。手册里把这一步写成**必须停下等人的节点**，而不是含糊带过。
+
+---
+
+## 2026-10-27 23:58 · 群聊行为收紧 + 联网 + @昵称
+
+### 本轮改动（7 个 commit）
+
+| commit | 内容 |
+|---|---|
+| `8e64aae` | @别人时不插嘴 |
+| `7610f71` | 昵称命中收窄（只认「像在叫她」） |
+| `451bbba` | 关闭跟随窗口（话多主因） |
+| `de81ffc` | 跟随窗口回到 30 秒 |
+| `99fdfe5` + `9ae5edd` | 群聊联网：审批层不够，真正拦在 guard 层 |
+| `eb2c669` | 人设加「被指出问题别演一整套」 |
+| `4068ea1` | @别人还原昵称；`maxBubbles` 3 → 2 |
+
+### 验收
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| 仓库门禁 | `node cli.mjs check` | ✅ PASS 75 / FAIL 0 |
+| 本地补丁 | `node checks/check-patches.mjs` | ✅ 16/16（P1–P12 + 4 项配置） |
+| 行为回归 | `node checks/check-behavior.mjs` | ✅ 5/5，follow 占比 15% |
+| 人设 | `node checks/check-persona.mjs` | ✅ 234 / 293 字 |
+
+### 当前群聊参数
+
+```json
+{
+  "groupWake": { "probability": 0.1, "followMinutes": 0.5, "nicknames": ["肥鱼","大肥鱼"] },
+  "groupReplyAt": false,
+  "maxBubbles": 2,
+  "persona": "feiyu"
+}
+```
+
+### 行为证据（近 2 小时）
+
+| 日志 | 次数 |
+|---|---|
+| `wake: at` | 1 |
+| `wake: nickname` | 14 |
+| `wake: follow` | 42（多数在关闭窗口前） |
+| `wake: probability` | 1 |
+| `ambient: buffered` | 25 |
+| `voice tag at head` | 6 |
+| `group allowed read-only web tool` | 0（guard 放行不打日志） |
+| `member name lookup failed` | 0 |
+
+### 未验证 / 待观察
+
+| 项 | 说明 |
+|---|---|
+| 群聊搜索 | 用户口头确认「搜索好了」（23:43 她引用了网上内容），但 guard 放行不留日志，无法用命令复验 |
+| @昵称还原 | 改动后还没出现真实的 @别人 消息，未触发 |
+| 「别演一整套」 | 人设已改，需真实群聊观察 |
+
+### 遗留
+
+| 项 | 性质 |
+|---|---|
+| 群聊人设仍是 `feiyu`（私聊版，含「爱我」） | 建议换回 `feiyu-group`，否则群里会说出不合群的话 |
+| 长任务输出仍可能写成科普 | 人设只有「别演一整套」，未约束长度 |
+| 画面感比喻（尾巴、窝）密度偏高 | 风格问题，暂不动 |

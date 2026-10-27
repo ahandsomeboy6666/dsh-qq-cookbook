@@ -18,13 +18,21 @@
 | 3 | `create({cwd, agentPreset:'whale'})`（学习检索会话） | 学习/检索建会话失败 | 改成 `'standard'` |
 | 4 | `if (cfg.groupRequireAt && !mentionsSelf(...)) return` | 群里只有 @ 才回，像客服 | 换成唤醒层：@/昵称/跟随窗口/概率，其余进缓冲不调模型 |
 | 5 | `if (chat.kind === 'group' && chat.userId) segments.push({type:'at'...})` | 每条群回复都带 `@某人`，很假 | 加开关 `groupReplyAt`（默认 false），并剥掉模型自己写的 `@昵称 ` |
+| 6 | `const voiceMark=chunk.match(...)` 之前 | 模型自创 `[发送:QQ\|语音\|内容]`，标签原样发给用户 | 归一化成 `[语音] 内容`；`[语音]` 不在开头就挪到开头；burstSegments 兜底剥离未消费标签 |
+| 7 | `parseOperationReview`（`operation-context.js`） | 模型返回非纯 JSON → 语音合成中断，退化成文字 | 整体解析失败时从文本里抠第一个 `{...}` 再试 |
+| 8 | 群唤醒判断 `if (atMe) ... else if (nickHit)` | 你 @ 别人说话，她也插嘴 | 加 `atOthers`：@ 了别人（含 @全体）就不唤醒 |
+| 9 | 同上，`nickHit` 的判定 | 句子里出现「肥鱼」就接（「本地肥鱼接入qq」也接） | 只认「像在叫她」：句首称呼，或紧跟「在吗/在不在/你说」 |
+| 10 | `ctx.on('approval/request')` | 群聊所有工具审批一律 rejected | 群聊只放行 `web_search` / `web_fetch` |
+| 11 | `installAgentContext` 的 `tools.guard` | 真凶：`ownerToolDenial` 对 `kind !== 'private'` 直接返回「没有全局操作权限」，模型连调用机会都没有 | 群聊注册专用 guard：放行只读联网，其余仍拒 |
+| 12 | text 计算之后（群分支内） | `@别人` 只有 QQ 号，她只能反问「@1619919517 是谁」 | `resolveMemberName` 查 `get_group_member_info`，换成群名片/昵称，缓存 6 小时 |
 
 补丁 4 新增的符号（重打时一并复制）：
 
 - `normalizeGroupWake(value)`：解析 `groupWake` 配置
-- `groupBuffers` / `groupFollowUntil` / `groupLastWake`：三个 Map
+- `groupBuffers` / `groupFollowUntil` / `groupLastWake` / `groupWakeSender`：四个 Map
 - `bufferGroupMessage(groupId, text, payload)`：未唤醒消息进缓冲（上限 `bufferSize`）
 - `takeGroupContext(groupId)`：取出最近 `recentLimit` 条拼成 `[群里最近的消息] … [记录结束]`
+- `resolveMemberName(groupId, qq)`（补丁 12）：群成员昵称缓存
 
 ## 二、配置（`~/.dsh/profiles/desktop/cordis.patch.yml`）
 
