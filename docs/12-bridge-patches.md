@@ -25,6 +25,8 @@
 | 10 | `ctx.on('approval/request')` | 群聊所有工具审批一律 rejected | 群聊只放行 `web_search` / `web_fetch` |
 | 11 | `installAgentContext` 的 `tools.guard` | 真凶：`ownerToolDenial` 对 `kind !== 'private'` 直接返回「没有全局操作权限」，模型连调用机会都没有 | 群聊注册专用 guard：放行只读联网，其余仍拒 |
 | 12 | text 计算之后（群分支内） | `@别人` 只有 QQ 号，她只能反问「@1619919517 是谁」 | `resolveMemberName` 查 `get_group_member_info`，换成群名片/昵称，缓存 6 小时 |
+| 13 | `const followed = sameSpeaker &&` | 她问「你呢」你三分钟后答，消息进 buffered 不接 | 她最后一条是问句 → `groupAwaitingAnswer` 记 5 分钟，期间同一人回话都算 follow |
+| 14 | `const pause = 600 + Math.random() * 2200` | 条间延迟与长短无关：短句等 2 秒、长段 0.6 秒 | 按上一条字数算打字时间：每字 38ms，上限 2.4s，加 0.45s 思考 |
 
 补丁 4 新增的符号（重打时一并复制）：
 
