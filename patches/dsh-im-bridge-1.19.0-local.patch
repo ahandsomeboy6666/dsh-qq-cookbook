@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..1f82db1 100644
+index 83d8357..8faae9c 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -275,10 +275,10 @@ index 83d8357..1f82db1 100644
 +        );
 +        const sameSpeaker = groupWakeSender.get(groupId) === senderId;
 +        // 跟随窗口只对「上次主动找她说话的那个人」有效，且 follow 本身不续期。
-+        // 例外：她刚问过问题（在等回答），窗口放宽到 5 分钟。
++        // 「等回答」是例外：她问的是群里所有人，谁答都算，不限定同一个人。
 +        const awaitingAnswer = (groupAwaitingAnswer.get(groupId) ?? 0) > Date.now();
-+        const followed = sameSpeaker
-+          && ((groupFollowUntil.get(groupId) ?? 0) > Date.now() || awaitingAnswer);
++        const followed = awaitingAnswer
++          || (sameSpeaker && (groupFollowUntil.get(groupId) ?? 0) > Date.now());
 +        const gap = Date.now() - (groupLastWake.get(groupId) ?? 0);
 +        let reason = '';
 +        if (atMe) reason = 'at';
