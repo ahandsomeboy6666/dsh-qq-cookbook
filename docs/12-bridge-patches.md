@@ -25,8 +25,10 @@
 | 10 | `ctx.on('approval/request')` | 群聊所有工具审批一律 rejected | 群聊只放行 `web_search` / `web_fetch` |
 | 11 | `installAgentContext` 的 `tools.guard` | 真凶：`ownerToolDenial` 对 `kind !== 'private'` 直接返回「没有全局操作权限」，模型连调用机会都没有 | 群聊注册专用 guard：放行只读联网，其余仍拒 |
 | 12 | text 计算之后（群分支内） | `@别人` 只有 QQ 号，她只能反问「@1619919517 是谁」 | `resolveMemberName` 查 `get_group_member_info`，换成群名片/昵称，缓存 6 小时 |
-| 13 | `const followed = sameSpeaker &&` | 她问「你呢」你三分钟后答，消息进 buffered 不接 | 她最后一条是问句 → `groupAwaitingAnswer` 记 5 分钟，期间同一人回话都算 follow |
+| 13 | `const followed = sameSpeaker &&` | 她问「你呢」你三分钟后答，消息进 buffered 不接 | 她最后一条是问句 → `groupAwaitingAnswer` 记 5 分钟；**不限定同一人**（她问的是群里所有人） |
 | 14 | `const pause = 600 + Math.random() * 2200` | 条间延迟与长短无关：短句等 2 秒、长段 0.6 秒 | 按上一条字数算打字时间：每字 38ms，上限 2.4s，加 0.45s 思考 |
+| 15 | 唤醒判断 `nickHit` 之后 | 「大肥鱼又不说话了」→「你能上网吗」，后一句没称呼，不接 | 入站消息提到昵称记 `groupMentionedAt`（60 秒），期间问句算在问她 |
+| 16 | 同上 | 「喂，肥鱼在嘛」整句不命中：只认「在吗」、问句正则没有「嘛」、短呼叫无人处理 | 呼语加「在嘛」；问句正则加「嘛」；新增 `looksSummon`（≤8 字含喂/嘿/哎/诶/人呢/在吗） |
 
 补丁 4 新增的符号（重打时一并复制）：
 
