@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..11598bc 100644
+index 83d8357..3ee22c2 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -91,7 +91,22 @@ index 83d8357..11598bc 100644
      const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
      let cursor = 0;
      let match;
-@@ -4246,6 +4296,18 @@ export function apply(ctx, rawConfig) {
+@@ -4146,9 +4196,11 @@ export function apply(ctx, rawConfig) {
+         if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)||auditById(chat.auditId)?.status==='superseded') return;
+         let chunk = chunks[index];
+         if (index > 0) {
+-          // The pause between two bubbles is what makes it read like someone
+-          // typing rather than one paragraph being pasted in.
+-          const pause = 600 + Math.random() * 2200;
++          // 按上一条的长度估算「打完这段话要多久」：短句快、长句慢。
++          // 每字约 38ms，上限 2.4 秒，再加 0.45s 的「想一下」和一点抖动。
++          const prevLen = [...(chunks[index - 1] ?? '')].length;
++          const typing = Math.min(2400, prevLen * 38);
++          const pause = 450 + typing + Math.random() * 350;
+           await new Promise((resolve) => setTimeout(resolve, pause));
+         }
+         if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)) return;
+@@ -4246,6 +4298,18 @@ export function apply(ctx, rawConfig) {
          // a successful render it degrades to plain text instead of vanishing.
          let voiceFile = null;
          let voiceShare=null;
@@ -110,7 +125,7 @@ index 83d8357..11598bc 100644
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4532,7 +4594,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4596,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -121,7 +136,7 @@ index 83d8357..11598bc 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4713,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4715,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -130,7 +145,7 @@ index 83d8357..11598bc 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4824,54 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4826,54 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -185,7 +200,7 @@ index 83d8357..11598bc 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4907,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4909,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -194,7 +209,7 @@ index 83d8357..11598bc 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4929,69 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4931,69 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -265,7 +280,7 @@ index 83d8357..11598bc 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6082,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6084,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
