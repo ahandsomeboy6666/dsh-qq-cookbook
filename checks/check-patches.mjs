@@ -42,6 +42,7 @@ const PATCHES = [
   ['P13 她问过问题后的等回答窗口', 'groupAwaitingAnswer'],
   ['P14 按长度控制发话节奏', 'prevLen * 38'],
   ['P15 刚被提到后接问句', 'groupMentionedAt'],
+  ['P16 短促呼叫也接', 'looksSummon'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 

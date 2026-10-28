@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..85fdedf 100644
+index 83d8357..1f82db1 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -225,7 +225,7 @@ index 83d8357..85fdedf 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4940,79 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4940,82 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -255,6 +255,7 @@ index 83d8357..85fdedf 100644
 +          return at.startsWith(name)
 +            || at.startsWith('大' + name)
 +            || trimmed.includes(name + '在吗')
++            || trimmed.includes(name + '在嘛')
 +            || trimmed.includes(name + '在不在')
 +            || trimmed.includes(name + '你说');
 +        });
@@ -265,7 +266,9 @@ index 83d8357..85fdedf 100644
 +          groupMentionedAt.set(groupId, Date.now());
 +        }
 +        const mentionedRecently = Date.now() - (groupMentionedAt.get(groupId) ?? 0) < 60000;
-+        const looksQuestion = /[？?]|吗|呢|咋|怎么/.test(text);
++        const looksQuestion = /[？?]|吗|嘛|呢|咋|怎么/.test(text);
++        // 短促呼叫：「喂」「在吗」「人呢」——被叫就该应一声。
++        const looksSummon = text.length <= 8 && /喂|嘿|哎|诶|人呢|在吗|在嘛|在不在/.test(text);
 +        // 这条消息在 @ 别人（含 @全体）：是冲别人说的，不该插嘴。
 +        const atOthers = messageSegments(payload.message).some(
 +          (segment) => segment?.type === 'at' && String(segment?.data?.qq ?? '') !== String(selfId),
@@ -282,7 +285,7 @@ index 83d8357..85fdedf 100644
 +        else if (nickHit) reason = 'nickname';
 +        else if (atOthers) reason = ''; // @ 的是别人，且没叫她：不接
 +        else if (onlyImage) reason = ''; // 表情包/纯图不接，只有点名才理
-+        else if (mentionedRecently && looksQuestion && sameSpeaker) reason = 'mentioned'; // 刚被提到，接着问的是她
++        else if (mentionedRecently && (looksQuestion || looksSummon)) reason = 'mentioned'; // 刚被提到，接着问/叫的就是她
 +        else if (followed && gap >= 3000) reason = 'follow';
 +        else if (gap >= 25000 && Math.random() < wake.probability) reason = 'probability';
 +        if (reason === '') {
@@ -306,7 +309,7 @@ index 83d8357..85fdedf 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6103,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6106,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
