@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..85a631e 100644
+index 83d8357..4d9370e 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -161,7 +161,7 @@ index 83d8357..85a631e 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4835,56 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4835,87 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -215,10 +215,41 @@ index 83d8357..85a631e 100644
 +      .join('\n');
 +  }
 +
++  /**
++   * 规则拿不准时，让模型判断「这句话是不是在跟她说」。
++   * 只在边缘消息上调用；失败一律当作不是在跟她说话，宁可少接。
++   */
++  async function groupIntentToMe(groupId, text) {
++    try {
++      const recent = (groupBuffers.get(groupId) ?? [])
++        .slice(-4)
++        .map((item) => `${item.sender}: ${item.text}`)
++        .join('\n');
++      const raw = await askModel(
++        [
++          '判断下面这条群消息是不是在跟群成员「肥鱼」说话（她是住在这个群里的一只小鲸鱼）。',
++          '算在跟她说话：回应她、问她、找她帮忙、接着她刚才的话说。',
++          '不算：在跟别的群成员说话、聊跟她无关的话题、只是顺口提到「鱼」或「她」。',
++          '只输出 JSON：{"to":true} 或 {"to":false}，不要解释。',
++        ].join('\n'),
++        JSON.stringify({ 最近群消息: recent, 当前消息: text }),
++        40, null, 8000, true,
++      );
++      const block = String(raw).match(/\{[\s\S]*\}/);
++      if (block === null) return false;
++      const verdict = JSON.parse(block[0]).to === true;
++      log(`group ${groupId} intent: ${verdict ? 'to-me' : 'not-me'} <- ${text.slice(0, 30)}`);
++      return verdict;
++    } catch (error) {
++      log(`group intent check failed: ${error?.message ?? error}`);
++      return false;
++    }
++  }
++
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4920,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4951,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -227,7 +258,7 @@ index 83d8357..85a631e 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4942,82 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4973,90 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -291,6 +322,14 @@ index 83d8357..85a631e 100644
 +        else if (followed && gap >= 3000) reason = 'follow';
 +        else if (gap >= 25000 && Math.random() < wake.probability) reason = 'probability';
 +        if (reason === '') {
++          // 规则全没命中：让模型判断这句是不是在跟她说话（B 方案兜底）。
++          // 只对「看起来像对话」的消息调用，避免每条群消息都花一次模型钱。
++          const borderline = /[？?]|吗|嘛|呢|吧|^你|帮我|觉得|怎么|咋/.test(text) || text.length <= 16;
++          if (borderline && !atOthers && !onlyImage && text !== '') {
++            if (await groupIntentToMe(groupId, text)) reason = 'model';
++          }
++        }
++        if (reason === '') {
 +          bufferGroupMessage(groupId, text, payload);
 +          return;
 +        }
@@ -311,7 +350,7 @@ index 83d8357..85a631e 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6108,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6147,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);

@@ -43,6 +43,7 @@ const PATCHES = [
   ['P14 按长度控制发话节奏', 'prevLen * 38'],
   ['P15 刚被提到后接问句', 'groupMentionedAt'],
   ['P16 短促呼叫也接', 'looksSummon'],
+  ['P17 模型判断是否在跟她说话', 'groupIntentToMe'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 
