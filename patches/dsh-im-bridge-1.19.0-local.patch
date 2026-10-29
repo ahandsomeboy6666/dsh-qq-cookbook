@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..8faae9c 100644
+index 83d8357..85a631e 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -125,7 +125,7 @@ index 83d8357..8faae9c 100644
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4287,6 +4351,13 @@ export function apply(ctx, rawConfig) {
+@@ -4287,6 +4351,15 @@ export function apply(ctx, rawConfig) {
            sendSegments(chat,groups[group]);
          }
        }
@@ -133,13 +133,15 @@ index 83d8357..8faae9c 100644
 +      // 普通 30 秒窗口会让「她问、你三分钟后答」这种情况漏掉。
 +      if (chat.kind === 'group' && chat.chatId) {
 +        const last = String(chunks[chunks.length - 1] ?? '');
-+        if (/[？?]\s*$/.test(last)) groupAwaitingAnswer.set(chat.chatId, Date.now() + 5 * 60000);
++        // 问句不一定带问号：「键盘都还热着吧」也算在等回答。
++        // 不收「呢」——「我在呢」是陈述，会误判。
++        if (/[？?]\s*$|[吗嘛吧]\s*[。！!~…]*\s*$/.test(last)) groupAwaitingAnswer.set(chat.chatId, Date.now() + 5 * 60000);
 +        else groupAwaitingAnswer.delete(chat.chatId);
 +      }
      }).catch((error) => log(`send failed: ${error?.message ?? error}`));
    }
    /* ---------------- NapCat 掉线自愈 ---------------- */
-@@ -4532,7 +4603,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4605,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -150,7 +152,7 @@ index 83d8357..8faae9c 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4722,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4724,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -159,7 +161,7 @@ index 83d8357..8faae9c 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4833,56 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4835,56 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -216,7 +218,7 @@ index 83d8357..8faae9c 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4918,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4920,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -225,7 +227,7 @@ index 83d8357..8faae9c 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4940,82 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4942,82 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -309,7 +311,7 @@ index 83d8357..8faae9c 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6106,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6108,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
