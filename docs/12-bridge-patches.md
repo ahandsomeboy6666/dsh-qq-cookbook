@@ -31,6 +31,10 @@
 | 16 | 同上 | 「喂，肥鱼在嘛」整句不命中：只认「在吗」、问句正则没有「嘛」、短呼叫无人处理 | 呼语加「在嘛」；问句正则加「嘛」；新增 `looksSummon`（≤8 字含喂/嘿/哎/诶/人呢/在吗） |
 | 17 | 唤醒判断末尾（`reason === ''` 后） | 规则全不命中时永远不接：隔一会儿再说一句就断 | 新增 `groupIntentToMe`：边缘消息调一次小模型（40 tokens、8 秒超时）判断「是不是在跟她说话」；失败当否 |
 | 18 | 唤醒判断 `atOthers` 之后 | 「你在干嘛」被模型判成 not-me（被上一句「现在我没@你」带偏） | 加 `directYou`：以「你」开头（排除「你们」）且 ≤12 字直接接，不问模型 |
+| 19 | `extractIncoming` 的类型映射表 | 群友发表情包，她只看到「（没说话）」，图完全不存在 | 映射表补 `image:'[图片]'`；`onlyImage` 改成剥掉 `[图片]` 后为空才算纯图 |
+| 20 | `takeGroupContext` / `bufferGroupMessage` | 图在缓冲里丢了，唤醒时她不知道有人发过图 | 缓冲时存图片 URL；唤醒时取最近 3 张挂 `payload._bridgeContextImages`，`buildContent` 末尾转 image block |
+| 21 | `takeGroupContext` 的空缓冲分支 | **空缓冲时 `return ''`（字符串）**，新代码读 `.images.length` → `undefined.length` → **整个 DSH 主进程崩溃** | 统一返回 `{ text: '', images: [] }`；调用处再做字符串/对象双兼容 |
+| 22 | `handlePayload` / `drainInbox` | 插件任何 `await` 抛错都变成未捕获 rejection，Node 24 直接终止进程 | fire-and-forget 调用全部加 `.catch()`，只记日志不终止进程 |
 
 补丁 4 新增的符号（重打时一并复制）：
 

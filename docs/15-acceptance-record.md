@@ -576,3 +576,121 @@ intent: not-me <- 你在干嘛        ❌（被上一句「现在我没@你」�
 | 编造生活细节 | 「换了个新头像」是即兴编的，没有一致时间线，说两次会露馅 |
 | 问句判断「吧」结尾 | 「行吧。」也会被判成在等回答，属可接受误判 |
 | 私聊人设仍是 49 字 | 没有安慰规则、没有口语化约束 |
+
+---
+
+## 2026-10-30 00:20 · 看图能力 + 一次把 DSH 带崩的补丁
+
+### 一、她本来就能看图，断在缓冲
+
+官方文档确认 `deepseek-flash` 支持图片输入（每张 ≤1024 tokens），插件里也早有 `imagePart()`。断点在**群聊缓冲**：
+
+```
+群友发表情包（没叫她）
+  → 进缓冲，只存文字
+  → 文字是「[图片]」，图本身丢了
+  → 你 @ 她时，payload 是文字消息，不含图
+  → 她只能看到「[图片]」占位
+```
+
+两处修复：
+
+| # | 改动 |
+|---|---|
+| P19 | `extractIncoming` 的映射表补 `image:'[图片]'`，不再兜底成空串 |
+| P20 | 缓冲存图片 URL；唤醒时取最近 3 张挂 `payload._bridgeContextImages`，`buildContent` 转 image block |
+
+### 二、验证记录
+
+```
+你：肥鱼你看到我发的图了吗
+她：看到啦，是个趴着不动的小娃娃，底下一行字：姐妹们我活不久了。
+她：……这不就是你现在嘛，别摆了，看着心疼。
+```
+
+三层都对：**识别画面 + 读出图内文字 + 结合「加班」上下文接梗**。
+
+后续又发同一张：
+
+```
+她：第三回还是它。
+她：我眼睛都好使了，换个新的来考我吧。
+```
+
+记住发过三次同一张图——不是"识别成功"，是"聊起来了"。
+
+### 三、崩溃：一个 `.length` 干掉整个 DSH
+
+**现象**：发图 → 她回复 → 用户再发一句 → DSH 弹出「应用意外停止」。
+
+崩溃日志（`%APPDATA%\@deepseek-ai\dsh-desktop\logs\crash-*.log`）：
+
+```
+TypeError: Cannot read properties of undefined (reading 'length')
+    at handlePayloadCore (index.js:5061)
+    at handlePayload (index.js:6036)
+    at MiniWebSocket.onMessage (index.js:4534)
+```
+
+**根因链**：
+
+```js
+if (list.length === 0) return '';   // 空缓冲返回字符串
+...
+const taken = takeGroupContext(groupId);
+taken.images.length                 // ''.images === undefined → 崩
+```
+
+触发序列正好是「发图 → 她回复（缓冲被清空）→ 再发一句」。
+
+**三层修复**：
+
+| # | 改动 | 作用 |
+|---|---|---|
+| P21 | 空缓冲返回 `{ text: '', images: [] }` | 统一返回形状 |
+| P21 | 调用处做字符串/对象双兼容 | 热重载期间新旧混跑也不崩 |
+| P22 | `handlePayloadCore` / `drainInbox` 的 fire-and-forget 加 `.catch` | **任何未捕获 rejection 只记日志，不再终止进程** |
+
+P22 才是真正堵漏的：插件里 `return void handlePayloadCore(payload)` 既没 await 也没 catch，Node 24 默认会把未捕获 rejection 升级成进程终止——所以一个 `.length` 就能带走整个桌面端。
+
+### 四、整轮验收
+
+| 项 | 结果 |
+|---|---|
+| `node cli.mjs check` | ✅ PASS 78 / FAIL 0 |
+| `node checks/check-patches.mjs` | ✅ 27/27（P1–P22 + 5 项配置） |
+| `node checks/check-behavior.mjs` | ✅ 5/5，follow 43% |
+| 人设 | 私聊 234 字 / 群聊 524 字（面板） |
+
+### 五、今晚唤醒分布（23:14 之后）
+
+| 触发 | 次数 |
+|---|---|
+| `nickname` | 8 |
+| `follow` | 6 |
+| `model`（模型兜底） | 3 |
+| `mentioned` | 2 |
+| `at` | 1 |
+| `you` | 1 |
+| `buffered` | 12 |
+| `intent` 判断 | 5 |
+
+七条唤醒路径全部有真实样本。
+
+### 六、NapCat 掉线的真因
+
+那次「重启后没反应」不是插件问题：
+
+```
+websocketClients: ws://127.0.0.1:6199/ws  enable=True   ← AstrBot 的旧端口
+```
+
+NapCat 一直尝试连这个死地址，刷错误把 OneBot 服务拖挂。关掉后 6700/6701 稳定监听。
+
+### 遗留
+
+| 项 | 说明 |
+|---|---|
+| 私聊人设 49 字 | 图能看、安慰规则没有 |
+| 编造生活细节 | 「换了个新头像」是即兴编的 |
+| 群聊图最多带 3 张 | 防 token 超支，超出的只看得到 `[图片]` |
