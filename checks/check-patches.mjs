@@ -44,6 +44,7 @@ const PATCHES = [
   ['P15 刚被提到后接问句', 'groupMentionedAt'],
   ['P16 短促呼叫也接', 'looksSummon'],
   ['P17 模型判断是否在跟她说话', 'groupIntentToMe'],
+  ['P18 你开头的短句直接接', 'directYou'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode).includes(needle) }))
 
