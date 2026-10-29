@@ -1,5 +1,18 @@
+diff --git a/bridge-features.js b/bridge-features.js
+index 587a624..bca2bff 100644
+--- a/bridge-features.js
++++ b/bridge-features.js
+@@ -33,7 +33,7 @@ export function extractIncoming(message, selfId='') {
+     const type=String(segment?.type||'');const data=segment?.data||{};
+     if(type==='text'){texts.push(String(data.text||''));addUrl(data.text);}
+     else if(type==='at'&&String(data.qq)!==String(selfId))texts.push('@'+String(data.qq||''));
+-    else if(['image','record','video','file','face','mface'].includes(type))texts.push(({record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');
++    else if(['image','record','video','file','face','mface'].includes(type))texts.push(({image:'[图片]',record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');
+     else if(type==='reply'&&messageIdValid(data.id))replies.push(String(data.id));
+     else if(type==='forward'&&String(data.id||'').length<200)forwards.push(String(data.id||''));
+     else if(type==='node'){const child=extractIncoming(data.content||data.message||[],selfId);texts.push('[转发] '+child.text);urls.push(...child.urls);cards.push(...child.cards);}
 diff --git a/index.js b/index.js
-index 83d8357..4edf831 100644
+index 83d8357..1764f68 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -259,7 +272,7 @@ index 83d8357..4edf831 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4974,94 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4974,95 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -293,7 +306,8 @@ index 83d8357..4edf831 100644
 +            || trimmed.includes(name + '在不在')
 +            || trimmed.includes(name + '你说');
 +        });
-+        const onlyImage = text === '' && carriesImage;
++        // 纯图（没有文字）仍然不主动接；图片段现在会变成「[图片]」，要把它剥掉再判断。
++        const onlyImage = carriesImage && text.replace(/\[图片\]/g, '').trim() === '';
 +        // 有人提到她（哪怕没叫她）：记一下时间，60 秒内同一个人问的问题算在问她。
 +        // 例：「大肥鱼又不说话了」→「你能上网吗」，后一句没有任何称呼，但语境是在问她。
 +        if ((wake.nicknames ?? []).some((name) => name !== '' && text.includes(name))) {
@@ -355,7 +369,7 @@ index 83d8357..4edf831 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6152,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6153,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
