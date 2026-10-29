@@ -28,7 +28,7 @@ index 587a624..8a6c6e6 100644
  export function describeSharedCard(card) {
    const label=card.kind==='music'?'音乐':card.kind==='video'?'视频':'链接';
 diff --git a/index.js b/index.js
-index 83d8357..37b9224 100644
+index 83d8357..15b92cb 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -190,7 +190,7 @@ index 83d8357..37b9224 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4835,91 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4835,92 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -234,7 +234,8 @@ index 83d8357..37b9224 100644
 +
 +  function takeGroupContext(groupId) {
 +    const list = groupBuffers.get(groupId) ?? [];
-+    if (list.length === 0) return '';
++    // 必须返回同样的形状：调用方读 .text / .images，返回字符串会直接崩掉主进程。
++    if (list.length === 0) return { text: '', images: [] };
 +    const recent = list.slice(-(cfg.groupWake?.recentLimit ?? 8));
 +    const omitted = list.length - recent.length;
 +    const head = omitted > 0 ? (omitted > 99 ? '（更早的大量消息已省略）' : `（更早的 ${omitted} 条已省略）`) : '';
@@ -282,7 +283,7 @@ index 83d8357..37b9224 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4955,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4956,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -291,7 +292,7 @@ index 83d8357..37b9224 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4977,101 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4978,104 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -374,10 +375,13 @@ index 83d8357..37b9224 100644
 +          return;
 +        }
 +        const taken = takeGroupContext(groupId);
-+        const context = taken.text;
++        // 兼容两种返回：老版本是纯字符串，新版本是 {text, images}。
++        // 热重载期间可能新旧混用，这里必须防御，否则 undefined.length 会崩掉整个 DSH 主进程。
++        const context = typeof taken === 'string' ? taken : String(taken?.text ?? '');
++        const contextImages = Array.isArray(taken?.images) ? taken.images : [];
 +        // 缓冲里的图挂到 payload 上，由 buildContent 转成 image block。
 +        // 不并进 inboundImages：那是当前消息自己的图，已经由 segment 逻辑处理，避免重复。
-+        if (taken.images.length > 0) payload._bridgeContextImages = taken.images;
++        if (contextImages.length > 0) payload._bridgeContextImages = contextImages;
 +        const spoken = text === '' && !carriesImage ? '（只 @ 了你，没说话）' : text;
 +        text = context === '' ? spoken : `${context}\n${spoken}`;
 +        groupLastWake.set(groupId, Date.now());
@@ -394,7 +398,7 @@ index 83d8357..37b9224 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5017,6 +5270,11 @@ export function apply(ctx, rawConfig) {
+@@ -5017,6 +5274,11 @@ export function apply(ctx, rawConfig) {
        } else if (segment?.type === 'video') {if(!await addVideoContent(segment.data||{},content,notes,chatKey))uncertain=true;}
        else if (segment?.type === 'file') { notes.push('收到文件：' + String(segment.data?.name || segment.data?.file || '未命名').slice(0,200) + '；文件正文未读取。'); uncertain = true; }
      }
@@ -406,7 +410,32 @@ index 83d8357..37b9224 100644
      if (shared.text) notes.push(shared.text);
      if (notes.length) content.unshift({ type: 'text', text: notes.join('\n\n') });
      content.uncertain = uncertain || shared.references.some(reference=>reference.mediaStatus==='failed'||['failed','partial'].includes(reference.status));
-@@ -5909,7 +6167,7 @@ export function apply(ctx, rawConfig) {
+@@ -5775,7 +6037,12 @@ export function apply(ctx, rawConfig) {
+     return payload.message_type === 'group' ? effectiveGroups().includes(group) && (!cfg.groupRequireAt || mentionsSelf(payload.message, payload.self_id)) : effectiveUsers().includes(user);
+   }
+   function handlePayload(payload) {
+-    if (!payload || payload.post_type !== 'message' || !incomingAllowed(payload)) return void handlePayloadCore(payload);
++    // 注意：handlePayloadCore 是 async 的，这里必须 catch。
++    // 否则任何 await 抛错都会变成未捕获的 Promise rejection，把 DSH 主进程带崩。
++    if (!payload || payload.post_type !== 'message' || !incomingAllowed(payload)) {
++      handlePayloadCore(payload).catch((error) => log(`handlePayloadCore failed: ${error?.message ?? error}`));
++      return;
++    }
+     const key = `${payload.message_type === 'group' ? 'group' : 'private'}:${payload.message_type === 'group' ? payload.group_id : payload.user_id}`;
+     const id = payload.message_id !== undefined ? `${payload.self_id}:${key}:${payload.message_id}` : randomUUID();
+     if (featureState.inbox.some(job => job.id === id)) return;
+@@ -5785,7 +6052,9 @@ export function apply(ctx, rawConfig) {
+     const now=Date.now(),firstQueued=featureState.inbox.find(j=>j.key===key&&j.status==='queued');
+     const ms=mergeable(payload)?debounceDelay(settings.companion.enabled?settings.companion.waitMode:'off',conversationStates()[key]?.lastSeen,firstQueued?.at||now,now,{mergedMs:settings.reliability.mergeMs,urgent:settings.reliability.mergeMs===0}):0;
+     if (inboxTimers.has(key)) clearTimeout(inboxTimers.get(key));
+-    if (ms > 0) inboxTimers.set(key, setTimeout(() => { inboxTimers.delete(key); void drainInbox(key); }, ms)); else void drainInbox(key);
++    // drainInbox 内部已有 try/catch，这里再兜一层，防止漏网的 rejection 终止 DSH。
++    const drain = () => { drainInbox(key).catch((error) => log(`drainInbox failed: ${error?.message ?? error}`)); };
++    if (ms > 0) inboxTimers.set(key, setTimeout(() => { inboxTimers.delete(key); drain(); }, ms)); else drain();
+   }
+   async function drainInbox(key) {
+     if (inboxRunning.has(key) || stopped || accountPaused) return;
+@@ -5909,7 +6178,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
