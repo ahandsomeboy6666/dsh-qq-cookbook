@@ -1,18 +1,34 @@
 diff --git a/bridge-features.js b/bridge-features.js
-index 587a624..bca2bff 100644
+index 587a624..8a6c6e6 100644
 --- a/bridge-features.js
 +++ b/bridge-features.js
-@@ -33,7 +33,7 @@ export function extractIncoming(message, selfId='') {
+@@ -27,13 +27,13 @@ export function segmentsOf(message) {
+   return result;
+ }
+ export function extractIncoming(message, selfId='') {
+-  const segments=segmentsOf(message);const texts=[];const cards=[];const replies=[];const forwards=[];const urls=[];
++  const segments=segmentsOf(message);const texts=[];const cards=[];const replies=[];const forwards=[];const urls=[];const images=[];
+   function addUrl(value){for(const m of String(value||'').matchAll(/https?:\/\/[^\s<>"'\u0000-\u001f]+/gi)){const raw=decodeEntities(m[0]).replace(/[，。！？、）】》；]+$/,'');try{const u=new URL(raw);if(!urls.includes(u.href))urls.push(u.href)}catch{}}}
+   for(const segment of segments.slice(0,100)) {
      const type=String(segment?.type||'');const data=segment?.data||{};
      if(type==='text'){texts.push(String(data.text||''));addUrl(data.text);}
      else if(type==='at'&&String(data.qq)!==String(selfId))texts.push('@'+String(data.qq||''));
 -    else if(['image','record','video','file','face','mface'].includes(type))texts.push(({record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');
-+    else if(['image','record','video','file','face','mface'].includes(type))texts.push(({image:'[图片]',record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');
++    else if(['image','record','video','file','face','mface'].includes(type)){texts.push(({image:'[图片]',record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');if(type==='image'){const src=String(data.url||data.file||'');if(/^https?:\/\//i.test(src)||/^data:image\//i.test(src))images.push(src);}}
      else if(type==='reply'&&messageIdValid(data.id))replies.push(String(data.id));
      else if(type==='forward'&&String(data.id||'').length<200)forwards.push(String(data.id||''));
      else if(type==='node'){const child=extractIncoming(data.content||data.message||[],selfId);texts.push('[转发] '+child.text);urls.push(...child.urls);cards.push(...child.cards);}
+@@ -74,7 +74,7 @@ export function extractIncoming(message, selfId='') {
+   }
+   if(replies.length)texts.push('[引用消息]');
+   if(forwards.length)texts.push('[合并转发]');
+-  return {text:texts.filter(Boolean).join('\n').trim().slice(0,20000),segments,cards,urls:[...new Set(urls)].slice(0,3),replies:[...new Set(replies)].slice(0,3),forwards:[...new Set(forwards)].slice(0,2)};
++  return {text:texts.filter(Boolean).join('\n').trim().slice(0,20000),segments,cards,images:[...new Set(images)].slice(0,4),urls:[...new Set(urls)].slice(0,3),replies:[...new Set(replies)].slice(0,3),forwards:[...new Set(forwards)].slice(0,2)};
+ }
+ export function describeSharedCard(card) {
+   const label=card.kind==='music'?'音乐':card.kind==='video'?'视频':'链接';
 diff --git a/index.js b/index.js
-index 83d8357..1764f68 100644
+index 83d8357..37b9224 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -174,7 +190,7 @@ index 83d8357..1764f68 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4835,88 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4835,91 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -206,10 +222,10 @@ index 83d8357..1764f68 100644
 +    }
 +  }
 +
-+  function bufferGroupMessage(groupId, text, payload) {
++  function bufferGroupMessage(groupId, text, payload, images = []) {
 +    const list = groupBuffers.get(groupId) ?? [];
 +    const sender = payload?.sender?.card || payload?.sender?.nickname || String(payload?.user_id ?? '');
-+    list.push({ at: Date.now(), sender, text: text === '' ? '（没说话）' : text });
++    list.push({ at: Date.now(), sender, text: text === '' ? '（没说话）' : text, images });
 +    const limit = cfg.groupWake?.bufferSize ?? 200;
 +    while (list.length > limit) list.shift();
 +    groupBuffers.set(groupId, list);
@@ -222,10 +238,13 @@ index 83d8357..1764f68 100644
 +    const recent = list.slice(-(cfg.groupWake?.recentLimit ?? 8));
 +    const omitted = list.length - recent.length;
 +    const head = omitted > 0 ? (omitted > 99 ? '（更早的大量消息已省略）' : `（更早的 ${omitted} 条已省略）`) : '';
++    // 缓冲里最近几张图跟着唤醒一起带上，否则她只知道「有人发了图」却看不到内容。
++    const images = recent.flatMap((item) => item.images ?? []).slice(-3);
 +    groupBuffers.delete(groupId);
-+    return ['[群里最近的消息]', head, ...recent.map((item) => `${item.sender}: ${item.text}`), '[记录结束]']
++    const text = ['[群里最近的消息]', head, ...recent.map((item) => `${item.sender}: ${item.text}`), '[记录结束]']
 +      .filter((line) => line !== '')
 +      .join('\n');
++    return { text, images };
 +  }
 +
 +  /**
@@ -263,7 +282,7 @@ index 83d8357..1764f68 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4952,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4955,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -272,12 +291,14 @@ index 83d8357..1764f68 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4974,95 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4977,101 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
 -    const text = extractIncoming(payload.message, selfId).text;
-+    let text = extractIncoming(payload.message, selfId).text;
++    const incoming = extractIncoming(payload.message, selfId);
++    let text = incoming.text;
++    const inboundImages = incoming.images ?? [];
      const carriesImage = messageSegments(payload.message).some((segment) => segment?.type === 'image');
 +    if (isGroup) {
 +      // OneBot 的 at 段只有 QQ 号；换成群名片/昵称，否则她会问「@1234567 是谁」。
@@ -349,10 +370,14 @@ index 83d8357..1764f68 100644
 +          }
 +        }
 +        if (reason === '') {
-+          bufferGroupMessage(groupId, text, payload);
++          bufferGroupMessage(groupId, text, payload, inboundImages);
 +          return;
 +        }
-+        const context = takeGroupContext(groupId);
++        const taken = takeGroupContext(groupId);
++        const context = taken.text;
++        // 缓冲里的图挂到 payload 上，由 buildContent 转成 image block。
++        // 不并进 inboundImages：那是当前消息自己的图，已经由 segment 逻辑处理，避免重复。
++        if (taken.images.length > 0) payload._bridgeContextImages = taken.images;
 +        const spoken = text === '' && !carriesImage ? '（只 @ 了你，没说话）' : text;
 +        text = context === '' ? spoken : `${context}\n${spoken}`;
 +        groupLastWake.set(groupId, Date.now());
@@ -369,7 +394,19 @@ index 83d8357..1764f68 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6153,7 @@ export function apply(ctx, rawConfig) {
+@@ -5017,6 +5270,11 @@ export function apply(ctx, rawConfig) {
+       } else if (segment?.type === 'video') {if(!await addVideoContent(segment.data||{},content,notes,chatKey))uncertain=true;}
+       else if (segment?.type === 'file') { notes.push('收到文件：' + String(segment.data?.name || segment.data?.file || '未命名').slice(0,200) + '；文件正文未读取。'); uncertain = true; }
+     }
++    // 群里唤醒时带上缓冲里最近的图（群友发的表情包等），否则她只能看到「[图片]」占位。
++    for (const url of payload?._bridgeContextImages ?? []) {
++      const part = await imagePart({ url }, chatKey, { record: false });
++      if (part) content.push(part);
++    }
+     if (shared.text) notes.push(shared.text);
+     if (notes.length) content.unshift({ type: 'text', text: notes.join('\n\n') });
+     content.uncertain = uncertain || shared.references.some(reference=>reference.mediaStatus==='failed'||['failed','partial'].includes(reference.status));
+@@ -5909,7 +6167,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);

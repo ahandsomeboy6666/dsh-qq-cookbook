@@ -49,6 +49,7 @@ const PATCHES = [
   ['P17 模型判断是否在跟她说话', 'groupIntentToMe'],
   ['P18 你开头的短句直接接', 'directYou'],
   ['P19 群图片记成[图片]', "image:'[图片]'"],
+  ['P20 唤醒时带上缓冲里的图', '_bridgeContextImages'],
 ]
 const patchResults = PATCHES.map(([name, needle]) => ({ name, ok: (code + ctxCode + featuresCode).includes(needle) }))
 
