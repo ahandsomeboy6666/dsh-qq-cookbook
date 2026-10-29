@@ -1,5 +1,5 @@
 diff --git a/index.js b/index.js
-index 83d8357..4d9370e 100644
+index 83d8357..4edf831 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -161,7 +161,7 @@ index 83d8357..4d9370e 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4835,87 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4835,88 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -228,8 +228,9 @@ index 83d8357..4d9370e 100644
 +      const raw = await askModel(
 +        [
 +          '判断下面这条群消息是不是在跟群成员「肥鱼」说话（她是住在这个群里的一只小鲸鱼）。',
-+          '算在跟她说话：回应她、问她、找她帮忙、接着她刚才的话说。',
++          '算在跟她说话：回应她、问她（尤其「你在干嘛」「你说呢」这类以「你」开头的）、找她帮忙、接着她刚才的话说、对她说自己的处境。',
 +          '不算：在跟别的群成员说话、聊跟她无关的话题、只是顺口提到「鱼」或「她」。',
++          '注意：群里只有她一个机器人在场时，带「你」的话默认是在跟她说；上一句在测试她也不影响判断。',
 +          '只输出 JSON：{"to":true} 或 {"to":false}，不要解释。',
 +        ].join('\n'),
 +        JSON.stringify({ 最近群消息: recent, 当前消息: text }),
@@ -249,7 +250,7 @@ index 83d8357..4d9370e 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4951,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4952,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -258,7 +259,7 @@ index 83d8357..4d9370e 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4973,90 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +4974,94 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -314,10 +315,14 @@ index 83d8357..4d9370e 100644
 +          || (sameSpeaker && (groupFollowUntil.get(groupId) ?? 0) > Date.now());
 +        const gap = Date.now() - (groupLastWake.get(groupId) ?? 0);
 +        let reason = '';
++        // 「你在干嘛」这类以「你」开头的短句，几乎一定是在跟某个人说话，
++        // 群里最可能的就是她。不用等模型判断（模型会被上下文带偏）。
++        const directYou = /^你(?!们)/.test(trimmed) && text.length <= 12;
 +        if (atMe) reason = 'at';
 +        else if (nickHit) reason = 'nickname';
 +        else if (atOthers) reason = ''; // @ 的是别人，且没叫她：不接
 +        else if (onlyImage) reason = ''; // 表情包/纯图不接，只有点名才理
++        else if (directYou) reason = 'you'; // 「你在干嘛」
 +        else if (mentionedRecently && (looksQuestion || looksSummon)) reason = 'mentioned'; // 刚被提到，接着问/叫的就是她
 +        else if (followed && gap >= 3000) reason = 'follow';
 +        else if (gap >= 25000 && Math.random() < wake.probability) reason = 'probability';
@@ -350,7 +355,7 @@ index 83d8357..4d9370e 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5909,7 +6147,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6152,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
