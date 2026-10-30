@@ -170,29 +170,6 @@ function sameQQVersion(a, b) {
   return pick(a) === pick(b)
 }
 
-/** 系统 QQ 的安装目录（要找 QQ.exe 旁边的 resources/locales）。 */
-function findSystemQQDir() {
-  const ps = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-    "$p=Get-ItemProperty 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'QQ' } | Select-Object -First 1; if($p -and $p.InstallLocation){$p.InstallLocation}elseif($p -and $p.DisplayIcon){Split-Path ($p.DisplayIcon -replace '\"','') }"],
-  { encoding: 'utf8', windowsHide: true, timeout: 20000 })
-  const fromReg = String(ps.stdout ?? '').trim().replace(/^"|"$/g, '')
-  if (fromReg !== '' && existsSync(join(fromReg, 'QQ.exe'))) return fromReg
-  for (const dir of ['D:\\Program Files', 'C:\\Program Files\\Tencent\\QQNT', 'C:\\Program Files (x86)\\Tencent\\QQNT', 'E:\\qq']) {
-    if (existsSync(join(dir, 'QQ.exe'))) return dir
-  }
-  return ''
-}
-
-/** 复制目录（QQ 有几千个文件，用 robocopy 比逐个写快且能保留结构）。 */
-function copyDirSync(from, to) {
-  const r = spawnSync('robocopy', [from, to, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/R:1', '/W:1'], {
-    encoding: 'utf8', windowsHide: true, timeout: 15 * 60 * 1000,
-  })
-  // robocopy 用 0/1 表示成功（1 = 复制了文件），>=8 才是错
-  if (r.status !== null && r.status < 8) return
-  throw new Error(`robocopy 退出码 ${r.status}: ${String(r.stderr ?? '').slice(0, 120)}`)
-}
-
 /** 系统里装的 QQ 版本（只用于提示，不影响 NapCat 注入哪个 QQ）。 */
 
 /** 下载 NapCat 的 OneKey 包（约 1MB，内部是安装器）并解压到 tools/napcat */
@@ -431,24 +408,15 @@ if (napcatDir) {
     step('安装 NapCat', 'TODO', '双击 tools/napcat/NapCatInstaller.exe，或加 --install-napcat')
   }
 }
-// 4.4 兜底：目录里没有 QQ.exe 时，把系统 QQ 的安装目录复制进来。
-// NapCat 的 launcher 只认 `%cd%\QQ.exe`；缺了会退到系统 QQ，版本对不上就崩。
+// 4.4 完整性检查：NapCat 必须带自己的 QQ。
+// 不复制系统 QQ——那是"凑合能用"，版本与 hook 对不上还是会崩，且掩盖了真问题。
 {
   if (napcatDir !== '' && !existsSync(join(napcatDir, 'QQ.exe'))) {
-    const sysDir = findSystemQQDir()
-    if (DRY) {
-      step('补 QQ 到 NapCat 目录', 'TODO', sysDir ? `从 ${sysDir} 复制` : '系统里找不到 QQ，需重装 OneKey')
-    } else if (sysDir !== '') {
-      try {
-        copyDirSync(sysDir, napcatDir)
-        step('补 QQ 到 NapCat 目录', 'OK', `从 ${sysDir} 复制了 QQ`)
-        console.log('        注意：拷进来的是系统那个版本，若与补丁不匹配仍会崩；崩了就用 --install-napcat 重装。')
-      } catch (error) {
-        step('补 QQ 到 NapCat 目录', 'FAIL', String(error?.message ?? error).slice(0, 140))
-      }
-    } else {
-      step('补 QQ 到 NapCat 目录', 'FAIL', '系统里也没找到 QQ，只能重装 OneKey（--install-napcat）')
-    }
+    step('NapCat 自带 QQ', 'FAIL', `目录里没有 QQ.exe（${napcatDir}）`)
+    console.log('        NapCat 只认自己目录里的 QQ.exe；用它自带的版本，hook 才对得上。')
+    console.log('        系统里装的 QQ 不要拿来凑：版本一错，注入即崩（QQNT.dll / 0x80000003）。')
+    console.log('        重新跑：node tools/setup.mjs --install-napcat')
+    console.log('        （OneKey 会下完整包，QQ 跟 NapCat 一起解压进这个目录）')
   }
 }
 const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.bat')

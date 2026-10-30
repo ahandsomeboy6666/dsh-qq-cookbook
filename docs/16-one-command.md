@@ -169,9 +169,8 @@ NapCatWinBootMain.exe "%cd%\QQ.exe" ... -q <QQ号>
 
 | 做法 | 命令/动作 |
 |---|---|
-| 重装 OneKey | `node tools/setup.mjs --install-napcat` |
-| 手动 | 把匹配版本的 QQ 解压进 `tools/napcat/<版本>/`，确认里面有 `QQ.exe` |
+| 重装 OneKey | `node tools/setup.mjs --install-napcat`（下完整包，QQ 跟 NapCat 一起解压进目录） |
 | 换协议端 | NapCatQQ-Desktop / Lagrange（不注入，另开一个进程） |
 
-> `qqnt.json` 里的 `version` 只是补丁的描述，和实际注入的 QQ 版本可以不同——
-> 本机就是「补丁写 9.9.22、实际跑 9.9.33」在正常工作。**判断依据永远是"目录里有没有 QQ.exe"。**
+> **不要拿系统里装的 QQ 去凑。** 版本与 hook 对不上照样崩，而且会掩盖真问题。
+> 判断依据永远是「`tools/napcat/<版本>/QQ.exe` 在不在」。
