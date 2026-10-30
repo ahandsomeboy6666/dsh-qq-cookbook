@@ -992,3 +992,19 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 不用管 qqnt.json 的 verHash
 更新仓库 → 重跑 node tools/setup.mjs → 它会自己补上缺的 35MB
 ```
+
+### 入口加固：让 agent 先读手册
+
+朋友那次暴露的不只是代码问题——**agent 从头到尾没读 `BOOTSTRAP.md`**。
+它读的是 `AGENTS.md` + `setup.mjs`，而 `AGENTS.md` 里一个字都没提部署手册，
+于是它自己摸索，走偏到 `package.json` 的 sha256 上。
+
+两处加固：
+
+| 位置 | 加什么 |
+|---|---|
+| `AGENTS.md` 第二节顶部 | 「要部署这个仓库？先读 BOOTSTRAP.md」+ 附上「有个 agent 花了 40 分钟」的具体教训 |
+| `BOOTSTRAP.md` 排查表 | 新增一行：**NapCat 起来了但端口不监听 = 目录缺文件**，重跑 setup 自动补；明确写「不要改 `package.json`、不要换 QQ 版本、不要装旧版 QQ」 |
+
+为什么写在 `AGENTS.md`：那是 agent 开工前必读的文件，把指引放在它真正会看的地方，而不是
+指望它主动去找一份没被引用的文档。
