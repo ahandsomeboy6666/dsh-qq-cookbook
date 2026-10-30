@@ -1062,3 +1062,16 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `node cli.mjs all` → 12/12
 
 **结论：T3/T9 从文档承诺变为运行时强制。**
+
+### 2026-10-31 总验收（语音 + 配置分层 + 安全强制）
+
+- [x] `node cli.mjs all` → **12/12 通过**
+  - 静态门禁 6 项：资产、事实、无泄漏、出站审计、日志无密钥、攻击演练（静态）
+  - 环境 6 项：DSH、NapCat、插件、人设、额度、浏览器
+- [x] OneBot connected（selfId 3866560965）
+- [x] 语音：火山 preview ok（engine=custom，复刻音色 + emotion）
+- [x] 安全：scanOutgoing 端到端拦截（job cancelled）+ .bridge.lock 单实例锁
+- [x] 配置分层：config.example.json 占位符 / config.local.json gitignore / cli init
+- [x] git：工作区干净，已推送
+
+**结论：可验收。**
