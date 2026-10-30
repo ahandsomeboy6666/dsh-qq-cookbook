@@ -875,3 +875,120 @@ NapCatWinBootMain.exe "%cd%\QQ.exe" ... -q <QQ号>
 | `node checks/check-behavior.mjs` | ✅ 5/5 |
 | 补丁与工作区一致性 | ✅ 通过 |
 | `setup.mjs --dry-run` | ✅ 13 个检查项，输出正确 |
+
+---
+
+## 2026-10-30 22:30 · NapCat 只装了一半（朋友实测）
+
+朋友的部署卡了 40 分钟。他那边 QQ 能启动、hook 注入成功
+（日志有 `preload succeeded` + `register done`），但 **6099/6700/6701 都不监听**，
+`logs/` 是空的。
+
+### 真因：目录里缺四个文件
+
+他那个 `NapCat.52230.Shell` 只有 3 项：`versions/`、`msvcp140.dll`、`QQ.exe`。
+我这边能跑的有 70+ 项。
+
+| 文件 | 我这边 | 他那边 |
+|---|---|---|
+| `napcat.mjs` | ✅ 2.99MB | ❌ |
+| `NapCatWinBootMain.exe` | ✅ | ❌ |
+| `NapCatWinBootHook.dll` | ✅ | ❌ |
+| `loadNapCat.js` | ✅ | ❌ |
+| `QQ.exe` | ✅ 1.64MB | ✅ 1.63MB |
+
+**hook 能注入是因为 QQ.exe 在；JS 主程序不在，所以没人去开端口。**
+
+### 为什么会只装一半
+
+NapCat 的发布包结构：
+
+| 包 | 大小 | 是什么 |
+|---|---|---|
+| `NapCat.Shell.Windows.OneKey.zip` | **971KB** | **只是下载器** |
+| `NapCat.Shell.zip` | **35MB** | 真正的 JS 层 |
+| `NapCat.Shell.Windows.Node.zip` | 121MB | 带 Node 运行时 |
+
+OneKey 运行时去下 35MB Shell + 1.2GB QQ。**他那边网络断了**（agent 自己写着
+「GitHub / npm registry 全部 TLS 连不上」），35MB 那个失败，1.2GB 的下完了，
+**而 OneKey 部分失败照样弹「完成」**。
+
+### 他的 agent 走错的方向
+
+它花了 30 分钟研究「QQ 9.9.33 会校验 `package.json` 的 sha256」，
+还试着改 `package.json` 让 QQ 指向 NapCat loader → QQ 直接不启动。
+
+**但 NapCat 根本不改 `package.json`**，它靠 `napcat.quick.bat` 里的五个环境变量注入：
+
+```bat
+set "NAPCAT_PATCH_PACKAGE=%cd%\qqnt.json"
+set "NAPCAT_LOAD_PATH=%cd%\loadNapCat.js"
+set "NAPCAT_INJECT_PATH=%cd%\NapCatWinBootHook.dll"
+set "NAPCAT_LAUNCHER_PATH=%cd%\NapCatWinBootMain.exe"
+set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
+"%NAPCAT_LAUNCHER_PATH%" "%cd%\QQ.exe" "%NAPCAT_INJECT_PATH%" -q <QQ号>
+```
+
+这些文件他一个都没有——所以改 `package.json` 是拿错工具修错东西。
+
+### 修复：检查 + 自动补齐
+
+| # | 改动 |
+|---|---|
+| 1 | `NAPCAT_REQUIRED` 五个文件，`findNapcat` 只认齐全的目录 |
+| 2 | partial 检查提到 DRY 之前（否则 dry-run 只会说"去下载"，把真问题藏起来） |
+| 3 | `repairNapcatShell`：自动下 35MB 的 `NapCat.Shell.zip` 解压进现有目录 |
+
+隔离环境实测（只放 `QQ.exe` + `versions`）：
+
+```
+[FAIL] NapCat 本体  目录不完整，缺 napcat.mjs、NapCatWinBootMain.exe、...
+[OK]   补全 NapCat  34.3MB 已解压，五个文件齐全     ← 10.9 秒
+```
+
+该 zip 不含 `QQ.exe`，解压不会覆盖宿主。
+
+### 一个重要的环境事实
+
+补包第一次失败，超时 180 秒。查下来是 **Node 的 `fetch` 不读系统代理**：
+
+| 下载方式 | 速度 | 35MB 需要 |
+|---|---|---|
+| PowerShell（走系统代理 7890） | **1.6 MB/s** | **22 秒** |
+| node fetch · gh-proxy | 70 KB/s | 8 分钟 |
+| node fetch · 直连 | 7 KB/s | 80 分钟 |
+
+所以补包改用 PowerShell 的 `Invoke-WebRequest`，镜像优先。
+**这条对所有 GitHub 大文件下载都成立**——以后加下载逻辑要记住。
+
+### 第三次「检查写了但不完整」
+
+| 次数 | 检查了什么 | 漏了什么 | 后果 |
+|---|---|---|---|
+| 1 | 补丁文件存在 | 补丁是否最新 | 换机器打老补丁 |
+| 2 | NapCat 目录存在 | 有没有 `QQ.exe` | 注入即崩 |
+| 3 | 有 `napcat.bat` | 有没有 `napcat.mjs` 和 launcher | **hook 成功但端口不监听** |
+
+共同点：**只验证"有没有东西"，不验证"能不能跑"。**
+而且第 3 次修的时候，我第一版把检查放在 `DRY` 分支之后，dry-run 根本走不到——
+**验证本身也需要被验证**。
+
+### 验收
+
+| 项 | 结果 |
+|---|---|
+| `node cli.mjs check` | ✅ PASS 81 / FAIL 0 |
+| `node checks/check-patches.mjs` | ✅ 27/27 |
+| `node checks/check-behavior.mjs` | ✅ 5/5 |
+| 补丁与工作区一致性 | ✅ 通过 |
+| 本机完整目录 | ✅ `[SKIP]` + `[OK] NapCat 自带 QQ 9.9.33.52230` |
+| 隔离不完整目录 | ✅ 报缺 4 个文件，自动补 34.3MB 后齐全 |
+
+### 给同样卡住的人的结论
+
+```
+不用装旧版 QQ
+不用改 package.json
+不用管 qqnt.json 的 verHash
+更新仓库 → 重跑 node tools/setup.mjs → 它会自己补上缺的 35MB
+```
