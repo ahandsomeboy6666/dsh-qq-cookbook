@@ -22,8 +22,14 @@ QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH
 
 ## 二、开工前必读
 
+> **要部署这个仓库？先读 [BOOTSTRAP.md](BOOTSTRAP.md)。**
+> 那是给 agent 的分步手册：问哪三个号、跑什么命令、哪一步必须停下来等人、失败时看哪里。
+> **不要自己摸索 NapCat** —— 2026-10-30 有个 agent 在这上面花了 40 分钟，
+> 最后发现只是目录缺了 `napcat.mjs`（跑一遍 `setup.mjs` 就自动补上）。
+
 | 文件 | 讲什么 |
 |---|---|
+| **[BOOTSTRAP.md](BOOTSTRAP.md)** | **给 agent 的部署手册**（要装东西就先看这个） |
 | [README.md](README.md) | 全貌、一分钟选型、最小回环步骤 |
 | [docs/00-proposal.md](docs/00-proposal.md) | 提案：目标、非目标、成功标准、待确认决策 |
 | [docs/01-tech-selection.md](docs/01-tech-selection.md) | 技术选型：五条接入通道对比与推荐 |

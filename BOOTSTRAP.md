@@ -131,6 +131,7 @@ Get-Content "$env:USERPROFILE\.dsh\im-bridge\bridge.log" -Tail 20
 | 语音没声音 | `bridge.log` 搜 `voice failed`；配置在 `settings.json` 的 `voice` |
 | 群聊不理人 | 群里要 @，或配置了 `groupWake` 概率唤醒 |
 | NapCat 连不上 | 6700/6701 端口在不在；`napcat.quick.bat` 启动没 |
+| **NapCat 起来了但 6700/6701 不监听** | **不是启动问题，是目录缺文件。** 看 `tools/napcat/*/napcat.mjs` 在不在；缺了就重跑 `node tools/setup.mjs`——它会自动补 35MB 的 Shell 层。**不要改 `package.json`，不要换 QQ 版本，不要装旧版 QQ。** |
 | 补丁丢了 | `node checks/check-patches.mjs` 会指出是哪一条 |
 
 详细排查见 [docs/16](docs/16-one-command.md)、[docs/12](docs/12-bridge-patches.md)、[docs/17](docs/17-voice.md)。
