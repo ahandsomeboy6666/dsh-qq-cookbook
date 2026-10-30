@@ -55,9 +55,10 @@ node tools/setup.mjs      # 会问你 QQ 号 / 群号
 双击 `tools\一键启动肥鱼.bat`：自动检查并启动 NapCat、DSH，再验证桥接是否连上。
 
 `
-[1/3] NapCat（6700）... 已在运行
-[2/3] DSH 桌面端 ... 已在运行
-[3/3] 桥接状态 ... ok 已连接
+[1/4] NapCat（6700）... 已在运行
+[2/4] DSH 桌面端 ... 已在运行
+[3/4] TTS（火山引擎豆包语音）... ok 8080 + 8090
+[4/4] 桥接状态 ... ok 已连接
   实测 probe-onebot ... ok connected，selfId=3866560965
 `
 
@@ -65,6 +66,9 @@ node tools/setup.mjs      # 会问你 QQ 号 / 群号
 ## 快速开始（D0–D3）
 
 ```powershell
+# 个人配置：从模板生成 config.local.json，填你的 QQ 号/群号/音色
+node cli.mjs init
+
 # D0 环境（NapCat 未启动时 connected=false，是正常的）
 node checks/probe-dsh.mjs --json --dsh-url http://127.0.0.1:<桌面端端口>
 node checks/probe-onebot.mjs --json
@@ -96,12 +100,12 @@ node cli.mjs status
 ## 目录
 
 ```
-docs/            提案、选型、架构、安全、UX 规格、验收、路线、方法论、本地补丁
+docs/            提案、选型、架构、安全、UX、验收、路线、方法论、本地补丁、语音（17–20）、配置分层（21）
 docs/decisions/  ADR（每个技术决策一篇，含风险与验证方式）
 docs/references/ 外部事实基线（版本、出处、体验评分）
 docs/templates/  可复制到其他项目的模板
 tasks/           任务卡：D0–D3 部署（主线）+ 01–09 自建（已归档）
-checks/          检查脚本（资产、一致性、DSH、OneBot、安装、人设、补丁、额度、浏览器）
+checks/          检查脚本（资产、一致性、隐私、审计、日志、演练、DSH、OneBot、安装、人设、补丁、额度、浏览器）
 ```
 
 文档索引：[docs/README.md](docs/README.md)。
@@ -130,6 +134,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 - 购物受益人只有「你」和「肥鱼自己」；转账/红包永远拒绝。
 - 小号只充余额、不绑主卡；每笔记账。
 - 支付确认走小额免密或人工，不给主号密码。
+- **出站审计**：回复含本机路径/凭据/私钥 → 发送前拦截（已实测）；单实例锁防双开。
 
 红线与对策见 [docs/03-threat-model.md](docs/03-threat-model.md)，授权模型见 [当前方案](docs/10-current-plan.md)。
 
@@ -146,7 +151,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 环境（NapCat / cheems / 人设） | ✅ 已就绪（2026-10-27） |
 | 本地补丁（群聊唤醒层等） | ✅ 已生效，见 [补丁清单](docs/12-bridge-patches.md) |
 | 浏览器能力（Playwright MCP） | ✅ 已生效，见 [浏览器能力](docs/13-browser-mcp.md) |
-| 语音（MiniMax 克隆音色 / edge-tts 备用） | ✅ 已生效，见 [语音](docs/17-voice.md) |
+| 语音（可选，默认不接入） | ✅ 火山引擎豆包语音（复刻音色 + emotion），见 [语音选型](docs/20-tts-selection.md) |
 
 ## 状态
 
@@ -156,4 +161,4 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | D1 | 装 cheems，私聊/群聊打通 | ✅ 完成（私聊 + 群聊均通，含空 @） |
 | D2 | 私聊/群聊两套人设 | ✅ 完成（`feiyu` / `feiyu-group`，preset=standard） |
 | D3 | 浏览器能力 + 30 元零花钱授权 | ✅ 浏览器已通；额度只靠「小号只充 30 元」的物理上限，不写人设、不做代码闸门（见 [说明](docs/14-allowance.md)） |
-| 附加 | 语音（MiniMax 克隆音色）、群聊唤醒层、贴吧风群聊人设 | ✅ 已生效，见 [语音](docs/17-voice.md) / [补丁清单](docs/12-bridge-patches.md) |
+| 附加 | 语音（火山引擎，可选）、群聊唤醒层、贴吧风群聊人设 | ✅ 已生效，见 [语音选型](docs/20-tts-selection.md) / [补丁清单](docs/12-bridge-patches.md) |
