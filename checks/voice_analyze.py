@@ -31,8 +31,18 @@ def load_wav(path):
     return x, sr
 
 
+def resample_to(x, sr, target=16000):
+    if sr == target or len(x) == 0:
+        return x
+    n = int(len(x) * target / sr)
+    idx = np.linspace(0, len(x) - 1, n)
+    return np.interp(idx, np.arange(len(x)), x)
+
+
 def analyze(path):
     x, sr = load_wav(path)
+    x = resample_to(x, sr, 16000)
+    sr = 16000
     frame, hop = 1024, 256
     freqs, rms = [], []
     for start in range(0, len(x) - frame, hop):
