@@ -16,7 +16,7 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync, readFileSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
@@ -193,6 +193,41 @@ function detectInstalledQQ() {
 function sameQQVersion(a, b) {
   const pick = (v) => String(v).split(/[-.]/).slice(0, 3).join('.')
   return pick(a) === pick(b)
+}
+
+/**
+ * 补全 NapCat 的 JS 层（约 35MB）。
+ * OneKey 只下 QQ（1.2GB），Shell 包要单独下；网络一断就会只完成一半，
+ * 表现正是「hook 注入了、QQ 起来了，但端口不监听」。
+ * 这个包里没有 QQ.exe，解压进现有目录不会覆盖宿主。
+ */
+async function repairNapcatShell(napcatDir) {
+  const url = `https://github.com/${defaults.napcatRepo}/releases/latest/download/NapCat.Shell.zip`
+  const cacheDir = join(ROOT, 'tools', 'napcat')
+  await mkdir(cacheDir, { recursive: true })
+  const zip = join(cacheDir, 'NapCat.Shell.zip')
+  // 用 PowerShell 下载而不是 node fetch：
+  // node 的 fetch 不读系统代理，实测直连 7KB/s、镜像 70KB/s（35MB 要 8 分钟）；
+  // PowerShell 的 Invoke-WebRequest 会走系统代理，实测 1.6MB/s（22 秒）。
+  const fast = [`https://gh-proxy.com/${url}`, `https://ghfast.top/${url}`, url]
+  if (MIRROR_ARG !== '') fast.unshift(MIRROR_ARG.replace(/\/+$/, '') + '/' + url)
+  let ok = false
+  let lastError = ''
+  for (const candidate of fast) {
+    rmSync(zip, { force: true })
+    const dl = spawnSync('powershell.exe', ['-NoProfile', '-Command',
+      `$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -Uri '${candidate}' -OutFile '${zip}' -UseBasicParsing -TimeoutSec 150; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }`],
+    { encoding: 'utf8', windowsHide: true, timeout: 180000 })
+    if (dl.status === 0 && existsSync(zip) && statSync(zip).size > 5 * 1024 * 1024) { ok = true; break }
+    lastError = String(dl.stderr ?? '').trim().slice(0, 120) || `退出码 ${dl.status}`
+    console.log(`        补包失败，换下一个源…（${candidate.replace(/^https:\/\//, '').slice(0, 46)}）`)
+  }
+  if (!ok) throw new Error(`下载 Shell 包失败：${lastError}`)
+  const bytes = statSync(zip).size
+  const unzip = run('powershell.exe', ['-NoProfile', '-Command',
+    `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${napcatDir}' -Force`])
+  if (unzip.status !== 0) throw new Error('解压失败：' + String(unzip.stderr ?? '').slice(0, 140))
+  return bytes
 }
 
 /** 系统里装的 QQ 版本（只用于提示，不影响 NapCat 注入哪个 QQ）。 */
@@ -418,11 +453,29 @@ let napcatDir = await findNapcat()
 // 否则 dry-run 只会说「去下载」，把真正的问题（缺 napcat.mjs）藏起来。
 const partialNapcat = napcatDir === '' ? (await napcatCandidates()).filter((d) => napcatMissing(d).length > 0) : []
 for (const dir of partialNapcat) {
-  step('NapCat 本体', 'FAIL', `目录不完整，缺 ${napcatMissing(dir).join('、')}`)
+  const missing = napcatMissing(dir)
+  step('NapCat 本体', 'FAIL', `目录不完整，缺 ${missing.join('、')}`)
   console.log(`        ${dir}`)
   console.log('        NapCat 靠 napcat.quick.bat 里的 NAPCAT_* 环境变量 + launcher 注入，')
   console.log('        缺 napcat.mjs 会出现「hook 注入了、QQ 也起来了，但 6099/6700/6701 都不监听」。')
-  console.log('        重新解压完整的 NapCat Shell 包（不是 OneKey 安装器）到这个目录即可。')
+  if (DRY) {
+    console.log('        重跑时会自动补 35MB 的 NapCat.Shell.zip 进来（不含 QQ，不会覆盖宿主）。')
+  } else {
+    try {
+      console.log('        正在补 NapCat Shell 层（约 35MB）…')
+      const bytes = await repairNapcatShell(dir)
+      const stillMissing = napcatMissing(dir)
+      if (stillMissing.length === 0) {
+        step('补全 NapCat', 'OK', `${(bytes / 1024 / 1024).toFixed(1)}MB 已解压，五个文件齐全`)
+        napcatDir = dir
+      } else {
+        step('补全 NapCat', 'FAIL', `补完仍缺 ${stillMissing.join('、')}`)
+      }
+    } catch (error) {
+      step('补全 NapCat', 'FAIL', String(error?.message ?? error).slice(0, 150))
+      console.log('        手动补：下 NapCat.Shell.zip（35MB），解压进上面的目录，保留其中的 QQ.exe。')
+    }
+  }
 }
 if (napcatDir) {
   step('NapCat 本体', 'SKIP', napcatDir)
@@ -462,14 +515,20 @@ const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.ba
   const bundled = napcatBundledQQ(napcatDir)
   const patchVer = napcatPatchQQVersion(napcatDir)
   const systemQQ = detectInstalledQQ()
+  const qqFile = napcatDir === '' ? '' : join(napcatDir, 'QQ.exe')
   if (napcatDir === '') {
     step('NapCat 自带 QQ', 'SKIP', '还没装 NapCat，装好后重跑本脚本会检查')
-  } else if (bundled === '') {
+  } else if (!existsSync(qqFile)) {
     // 关键：没有自带 QQ 时，launcher 会去找系统 QQ——那里的版本和 hook 对不上就会崩。
     step('NapCat 自带 QQ', 'FAIL', `目录里没有 QQ.exe（${napcatDir}）`)
     console.log('        NapCat 的 launcher 启动的是它自己目录里的 QQ.exe；缺了就会退到系统 QQ，')
     console.log('        版本对不上会在 1 秒内崩（QQNT.dll / 0x80000003）。')
     console.log('        用 --install-napcat 重装 OneKey，或手动把匹配版本的 QQ 解压到这个目录。')
+  } else if (bundled === '') {
+    // 文件在，但读不出版本：多半不是有效的 QQ 程序（占位文件、下载中断的残片）。
+    step('NapCat 自带 QQ', 'FAIL', '有 QQ.exe 但读不出版本（可能不是有效的程序）')
+    console.log(`        ${qqFile}`)
+    console.log('        正常应该是 PE 可执行文件、带版本信息。这个替换成真实 QQ 再试。')
   } else {
     const patchNote = patchVer === '' ? '' : `，补丁面向 ${patchVer}`
     step('NapCat 自带 QQ', 'OK', `${bundled}（实际注入的就是它${patchNote}）`)
