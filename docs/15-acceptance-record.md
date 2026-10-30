@@ -791,3 +791,87 @@ GitHub 直连常超时，setup 现在会自动换镜像：
 ```
 
 第一次装会跑两遍（settings.json 要等插件初始化），这是 DSH 的初始化顺序，不是 bug。
+
+---
+
+## 2026-10-30 20:45 · 同事实测暴露的两个真问题
+
+同事实跑了一遍，卡在两处。两处都不是代码 bug，是**我的概念没讲清 / 判断错了**。
+
+### 一、把「主人号」当成「机器人小号」
+
+他填的 `1241415554` 是主人号（白名单），但 BOOTSTRAP 只问一个 QQ 号，
+agent 自然把它当成 NapCat 要扫码登录的号——差点用主号当机器人。
+
+| 号 | 干什么 |
+|---|---|
+| 主人号 | 白名单，只有它能命令机器人 |
+| 机器人小号 | NapCat 扫码登录，对外说话的身份 |
+
+修复：BOOTSTRAP 第一节改成先给对照表，再问三个号；代码输出从「QQ / 群」改成「主人号 / 群」。
+
+### 二、QQ 一启动就崩（0x80000003）
+
+```
+出错模块: QQNT.dll
+异常代码: 0x80000003   ← int3，QQ 自检发现被篡改后主动退出
+```
+
+**根因：NapCat 只认自己目录里的 `QQ.exe`。**
+
+`napcat.quick.bat` 最后一行写死：
+
+```bat
+NapCatWinBootMain.exe "%cd%\QQ.exe" ... -q <QQ号>
+```
+
+本机能跑，是因为 `tools/napcat/NapCat.52892.Shell/QQ.exe` 在（9.9.33.52230）；
+他那边 QQ 落到了 `D:\Program Files`，目录里没有 → launcher 退到系统 QQ → 版本与 hook 对不上 → 崩。
+
+### 判断错的三次（值得记）
+
+| 版本 | 判断 | 结果 |
+|---|---|---|
+| v1 | 比较「系统 QQ 版本」vs「NapCat 版本」 | ❌ 误报：本机 9.9.19 闲置，实际跑的是目录里的 9.9.33 |
+| v2 | 检查目录里有没有 `QQ.exe` | ✅ 对 |
+| v3 | 缺了就**从系统 QQ 复制**进来 | ❌ 掩盖问题：拷进来的版本照样和 hook 对不上 |
+| **v4** | 缺了就报 FAIL + 指引重跑 `--install-napcat` | ✅ 对 |
+
+共同毛病：**每次都想「自动修好」，但修的是症状不是原因。**
+
+两条原则是用户点出来的：
+1. 仓库里不含 NapCat 是对的（1.37GB，GitHub 放不下，且含 QQ 本体）
+2. **不能拿系统 QQ 去凑**——版本与 hook 对不上照样崩，还掩盖真问题
+
+### 三、安装器退出码 0 不等于装对了地方
+
+`NapCatInstaller.exe` 是 GUI，可能被改到别的路径。原来只看退出码，0 就报 OK。
+
+现在装完再跑一次 `findNapcat()`：
+
+```
+找到   → [OK] 已部署到 tools/napcat/NapCat.xxxxx.Shell
+没找到 → [FAIL] 装完了，但 <路径> 下还是找不到 NapCat（安装器可能装到了别的路径）
+```
+
+### 目录锁定
+
+四个环节都锁在同一个目录，任何一环偏了都会被下一个抓住：
+
+| 环节 | 目标 |
+|---|---|
+| 下载 zip | `tools/napcat/` |
+| 解压 | `tools/napcat/` |
+| 安装器 cwd | `tools/napcat/` |
+| 装完验证 | `findNapcat()` 只搜 `tools/napcat/` |
+| QQ 检查 | 只认 `tools/napcat/<版本>/QQ.exe` |
+
+### 验收
+
+| 项 | 结果 |
+|---|---|
+| `node cli.mjs check` | ✅ PASS 78 / FAIL 0 |
+| `node checks/check-patches.mjs` | ✅ 27/27 |
+| `node checks/check-behavior.mjs` | ✅ 5/5 |
+| 补丁与工作区一致性 | ✅ 通过 |
+| `setup.mjs --dry-run` | ✅ 13 个检查项，输出正确 |
