@@ -1039,3 +1039,15 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - 音高波动仍未完全还原（43 vs 58），可换更长参考音频。
 - 群聊语音未实测。
 - 参考音频 `ref-c4.wav` 在 `audio.cpp` 根目录，建议移到 `voices/`。
+
+### 2026-10-31 配置分层与隐私门禁
+
+- [x] `node cli.mjs all` → **9/9 通过**（新增「无个人配置泄漏」）
+- [x] `node cli.mjs check` → 3/3（资产 / 事实 / 无泄漏）
+- [x] `node cli.mjs init` → 生成 config.local.json（已在 .gitignore）
+- [x] 一键启动检测 config.local.json、gateway 指向 gateway-volc.mjs
+- [x] 通用文档脱敏：QQ/群号/随机端口 → 占位符；15 记录标注「本机实例」
+- [x] `checks/check-privacy.mjs` 接入 check 组
+- [x] 语音链路：火山 preview → ok（engine=custom）
+
+**结论：可验收。** 仓库默认无个人配置、无语音；部署者用模板生成自己的配置。
