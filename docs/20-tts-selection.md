@@ -275,3 +275,36 @@ Breeze 默认克隆出来很平（音高波动 28 Hz）。加上 `options.instru
 # 切回本地 IndexTTS 2
 curl -X POST http://127.0.0.1:<DSH端口>/im-bridge/settings -H "Content-Type: application/json" -d '{"voice":{"engine":"custom","customUrl":"http://127.0.0.1:8090/tts?text={text}"}}'
 ```
+## 八、2026-10-31 最终定稿：火山引擎豆包语音（复刻音色）
+
+经过本地模型（Breeze / CosyVoice 3 / IndexTTS 2）与 MiniMax 的多轮对比，最终选择**火山引擎豆包语音**：
+
+| 项 | 值 |
+|---|---|
+| 产品 | 豆包语音合成 2.0（复刻音色） |
+| ResourceId | `seed-icl-2.0` |
+| 音色 | `S_DfDMiwMj2`（「肥鱼音色」，用 C4 音频复刻） |
+| 鉴权 | `X-Api-Key`（控制台 API Key） |
+| 协议 | WebSocket `wss://openspeech.bytedance.com/api/v3/tts/bidirection`（V3 二进制帧） |
+| 情绪 | `emotion` 参数：happy/sad/angry/fear/hate/surprise/neutral |
+| 价格 | ≈ ¥10 / 万字符，有免费额度 |
+
+### 实现
+
+- `E:\workspace\audio.cpp\volc-tts.mjs`：协议客户端（帧构造/解析、事件机）
+- `E:\workspace\audio.cpp\gateway-volc.mjs`：GET → WS 网关，`direction` 关键词映射 emotion，**原样返回 mp3（不加工、不重编码）**
+- cheems：`engine=custom`，`customUrl=http://127.0.0.1:8090/tts?text={text}`
+
+### 实测
+
+- 时长 3.86s（参考 C4 3.88s）
+- 音高 228.5（参考 223.7）
+- 质心 1400（参考 1428，-2%）
+- 7 种语气样本全部生成成功，用户确认「很满意」
+
+### 关键坑
+
+1. **复刻音色必须用 `seed-icl-2.0`**，`seed-tts-2.0` 会报「resource ID mismatched」。
+2. 协议帧：4 字节 header + event(4) + session_id 长度+字节 + payload 长度+JSON。
+3. `buildPayload` 不能引用外层闭包变量（作用域错误）。
+4. QQ 语音会被 NapCat 转成 silk（低码率），音色必然有损；网页版是原始 mp3。
