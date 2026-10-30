@@ -10,6 +10,8 @@
 
 **当前方案（已拍板）**：`cheems135/dsh-qq-bridge` 插件 + NapCat，主线是**部署与验收**，不是自己写桥接。见 [docs/10-current-plan.md](docs/10-current-plan.md)。
 
+语音：本地 **Breeze-TTS-2**（Vulkan）+ C4 克隆，见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
+
 ```
 QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH（Web / ACP / SDK）
    ▲                                    │                │

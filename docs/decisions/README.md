@@ -17,6 +17,7 @@
 | D9 | 模型 | cheems 智力档位（省/标准/高/最高） | 固定模型 | 延迟、质量 | 已接受 |
 | D10 | 群聊 | 被 @ 才回，短、有梗、不刷屏 | 每条都回 | 刷屏、token | 已接受 |
 | D11 | 部署 | cheems 18 页面板 | 自建向导/控制台 | 上手时间 | 已接受 |
+| D12 | 语音 | 本地 Breeze-TTS-2（Vulkan）+ C4 克隆 + 情绪 instruct | Ming / Kokoro / 线上 API | 语音能力、显存占用 | 已接受 |
 
 ## ADR 索引
 
@@ -33,6 +34,7 @@
 | [ADR-009-model-routing.md](ADR-009-model-routing.md) | 智力档位切模型 | 已接受 |
 | [ADR-010-group-chat.md](ADR-010-group-chat.md) | 群聊被 @ 才回 | 已接受 |
 | [ADR-011-onboarding.md](ADR-011-onboarding.md) | 面板配置代替向导 | 已接受 |
+| [ADR-012-tts.md](ADR-012-tts.md) | 本地 Breeze-TTS-2 + C4 克隆 | 已接受 |
 
 ## 最终拍板记录
 

@@ -12,6 +12,7 @@
 | F4 | 阶段 | D0–D3（M0–M4 已归档） | [tasks/README.md](../tasks/README.md) | `README.md`、`docs/05-roadmap.md`、`docs/04-acceptance.md`、`docs/00-proposal.md` | `D0` | 人工 |
 | F5 | 零花钱授权 | 30/60/300、受益人 owner+self、禁转账 | [config.example.json](../config.example.json) | `docs/10-current-plan.md`、`tasks/13-allowance-browser.md`、`README.md` | `30` | `check-budget` |
 | F6 | 本机 Web 端口 | 桌面端随机（本次 `53800`） | `checks/probe-dsh.mjs` | `AGENTS.md` | `53800` | 探针 |
+| F7 | 语音（TTS）方案 | 本地 Breeze-TTS-2 q8_0（Vulkan）+ C4 克隆 + 情绪 instruct | [20-tts-selection.md](20-tts-selection.md) | `README.md`、`AGENTS.md`、`docs/17-voice.md` | `Breeze` | `check-assets`: FACTS 引用点 |
 
 ## 维护流程
 

@@ -59,6 +59,7 @@
 | [docs/decisions/ADR-009-model-routing.md](decisions/ADR-009-model-routing.md) | flash 默认、复杂任务升 pro、图片 M1 | 待确认 |
 | [docs/decisions/ADR-010-group-chat.md](decisions/ADR-010-group-chat.md) | 群聊只在触发时参与，短、分条、引用、冷却 | 待确认 |
 | [docs/decisions/ADR-011-onboarding.md](decisions/ADR-011-onboarding.md) | 一键向导 + 控制台 + 统一失败文案 | 待确认 |
+| [docs/decisions/ADR-012-tts.md](decisions/ADR-012-tts.md) | 本地 Breeze-TTS-2 + C4 克隆 | 已接受 |
 
 ## 外部事实基线
 

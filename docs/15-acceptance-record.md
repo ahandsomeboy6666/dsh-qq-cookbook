@@ -1008,3 +1008,32 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 
 为什么写在 `AGENTS.md`：那是 agent 开工前必读的文件，把指引放在它真正会看的地方，而不是
 指望它主动去找一份没被引用的文档。
+
+## 2026-10-30/31 · 语音（本地 Breeze）验收
+
+### 环境
+
+| 组件 | 版本 / 值 |
+|---|---|
+| GPU | AMD Radeon RX 9070 XT（Vulkan，fp16/bf16 + KHR_coopmat） |
+| 运行时 | audio.cpp v0.9.3（windows-x64-vulkan） |
+| TTS 模型 | Breeze-TTS-2 q8_0（5.08 GB，audio-cpp 官方 GGUF） |
+| ASR | Fun-ASR-Nano 2512 q8_0（1 GB，用于参考文本） |
+| 服务 | audiocpp_server :8080 + gateway :8090 |
+
+### 验收
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 静态门禁 | ✅ | `node cli.mjs check` → 2/2 |
+| 全量 | ✅ | `node cli.mjs all` → 8/8 |
+| OneBot | ✅ | `probe-onebot` → connected, selfId 3866560965 |
+| 语音链路 | ✅ | cheems `engine=custom` → 网关 → Breeze，`ok:true` |
+| 克隆相似度 | ✅ | 质心 1571 vs 原声 1353；语速 2.27 vs 2.38 |
+| 情绪起伏 | ✅ | instruct 后音高波动 43.1 Hz（原声 58.1） |
+
+### 遗留
+
+- 音高波动仍未完全还原（43 vs 58），可换更长参考音频。
+- 群聊语音未实测。
+- 参考音频 `ref-c4.wav` 在 `audio.cpp` 根目录，建议移到 `voices/`。
