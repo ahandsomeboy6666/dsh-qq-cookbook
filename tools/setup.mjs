@@ -402,8 +402,17 @@ if (napcatDir) {
   }
   if (INSTALL_NAPCAT) {
     const r = runNapcatInstaller(join(ROOT, 'tools', 'napcat'))
-    step('安装 NapCat', r.status === 0 ? 'OK' : 'FAIL', r.status === 0 ? '已下载 QQ 并部署' : String(r.stderr ?? '').slice(0, 120))
     napcatDir = await findNapcat()
+    if (r.status !== 0) {
+      step('安装 NapCat', 'FAIL', String(r.stderr ?? '').slice(0, 120))
+    } else if (napcatDir === '') {
+      // 安装器退出码 0 不等于装对了地方：它可能被改到别的目录。
+      step('安装 NapCat', 'FAIL', `装完了，但 ${join(ROOT, 'tools', 'napcat')} 下还是找不到 NapCat`)
+      console.log('        安装器可能装到了别的路径。把它装回 tools/napcat/，或把产物手动解压到这里：')
+      console.log(`        ${join(ROOT, 'tools', 'napcat')}`)
+    } else {
+      step('安装 NapCat', 'OK', `已部署到 ${relative(ROOT, napcatDir)}`)
+    }
   } else {
     step('安装 NapCat', 'TODO', '双击 tools/napcat/NapCatInstaller.exe，或加 --install-napcat')
   }
