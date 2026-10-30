@@ -121,20 +121,22 @@ async function downloadNapcatOneKey() {
   const dir = join(ROOT, 'tools', 'napcat')
   await mkdir(dir, { recursive: true })
   const zip = join(dir, 'NapCat.OneKey.zip')
-  // 同样走镜像 fallback：release 下载在国内也经常断。
+  // 同样走镜像 fallback：release 下载在国内也经常断。1MB 的包给 60 秒，20 秒不够。
   let res = null
   let lastError = ''
+  const tried = []
   for (const candidate of githubCandidates(url)) {
+    tried.push(candidate)
     try {
-      const attempt = await fetch(candidate, { signal: AbortSignal.timeout(20000) })
+      const attempt = await fetch(candidate, { signal: AbortSignal.timeout(60000) })
       if (attempt.ok && attempt.body) { res = attempt; break }
       lastError = `HTTP ${attempt.status}`
     } catch (error) {
       lastError = String(error?.message ?? error).slice(0, 120)
     }
-    console.log(`        下载失败，换下一个源…（${candidate.slice(0, 60)}）`)
+    console.log(`        下载失败，换下一个源…（${candidate.replace(/^https:\/\//, '').slice(0, 50)}）`)
   }
-  if (res === null) throw new Error('下载失败 ' + lastError + '（可加 --mirror 或设 GITHUB_MIRROR）')
+  if (res === null) throw new Error(`试过 ${tried.length} 个源都失败（最后错误：${lastError}）；可加 --mirror https://gh-proxy.com/ 或设 GITHUB_MIRROR`)
   const fh = await open(zip, 'w')
   let bytes = 0
   for await (const chunk of res.body) { await fh.write(chunk); bytes += chunk.length }
@@ -287,7 +289,15 @@ if (await exists(indexFile)) {
       step('应用本地补丁', 'FAIL', (check.stderr || '补丁与当前上游不兼容').trim().slice(0, 200))
     } else {
       run('git', ['apply', PATCH], VENDOR)
-      step('应用本地补丁', 'OK', '5 处改动')
+      // 数量从补丁本身数，别写死——补丁一直在长（现在 22 处）。
+      let hunks = 0
+      let files = 0
+      try {
+        const text = await readFile(PATCH, 'utf8')
+        hunks = (text.match(/^@@/gm) ?? []).length
+        files = (text.match(/^diff --git /gm) ?? []).length
+      } catch { /* 读不到就只报状态 */ }
+      step('应用本地补丁', 'OK', `${files} 个文件 / ${hunks} 处改动`)
     }
   }
 } else {
@@ -344,11 +354,15 @@ if (napcatDir) {
 const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.bat')
 
 /* 5. cordis.patch.yml：im-bridge 配置 + mcp-browser */
+// 新机器上 DSH 还没跑过，这个文件可能压根不存在——那就当空文件新建，不能直接 FAIL。
 let cordis = ''
-try { cordis = await readFile(CORDIS, 'utf8') } catch { /* 无配置文件 */ }
-if (!cordis) {
-  step('写 cordis.patch.yml', 'FAIL', `读不到 ${CORDIS}`)
-} else {
+let cordisExisted = true
+try { cordis = await readFile(CORDIS, 'utf8') } catch { cordisExisted = false }
+if (!cordisExisted) {
+  await mkdir(dirname(CORDIS), { recursive: true })
+  cordis = ''
+}
+if (true) {
   const blocks = []
   if (!cordis.includes('id: im-bridge')) {
     const groupLine = GROUP ? `    allowGroups: ['${GROUP}']` : '    allowGroups: []'
@@ -405,7 +419,7 @@ ${napcatBlock}
   } else {
     await backup(CORDIS)
     await writeFile(CORDIS, cordis.replace(/\s*$/, '') + '\n' + blocks.join(''), 'utf8')
-    step('写 cordis.patch.yml', 'OK', `${blocks.length} 个条目`)
+    step('写 cordis.patch.yml', 'OK', `${blocks.length} 个条目${cordisExisted ? '' : '（新建文件）'}`)
   }
 }
 
@@ -561,10 +575,12 @@ function summary() {
   const napcatHint = napcatDir
     ? `启动 NapCat（${napcatDir} 下的 napcat.quick.bat）并扫码登录`
     : '装 NapCat（解压后的 tools/napcat 里跑 NapCatInstaller.exe），再扫码登录'
+  // 第一次装的时候 settings.json 还不存在，人设写不进去——必须提示「启动后再跑一次」。
+  const personaSkipped = steps.some((s) => s.name === '写入人设' && s.status === 'SKIP' && /settings\.json/.test(s.detail ?? ''))
   console.log(`
   接下来要人做：
     1. ${napcatHint}
-    2. 重启 DSH 桌面端（让 cordis.patch.yml 与插件依赖生效）
+    2. 重启 DSH 桌面端（让 cordis.patch.yml 与插件依赖生效）${personaSkipped ? '\n       然后**再跑一次本脚本**：人设要等插件初始化后才有地方写' : ''}
     3. 小号只充 30 元，不绑主卡
     4. 在 QQ 里私聊发一句，确认有回复
 
