@@ -41,6 +41,7 @@
 | [docs/17-voice.md](17-voice.md) | **语音（TTS）**：四个引擎、edge-tts 装法、三个坑与验收 | 已生效 |
 | [docs/18-song-cover.md](18-song-cover.md) | **唱歌选型**：人声分离 + 零样本音色转换，两阶段路线与待验证项 | 选型中 |
 | [docs/19-voice-emotion.md](19-voice-emotion.md) | **语音情绪选型**：为什么像念稿（emotion 没传）、MiniMax 的 9 档情绪 + 语气词 + 停顿、三层路线 | 选型中 |
+| [docs/20-tts-selection.md](20-tts-selection.md) | **TTS 选型**：本地开源（Ming-3.0/CosyVoice/Breeze/IndexTTS）与线上 API 对比、AMD Vulkan 路径 | 选型中 |
 
 ## 决策记录（ADR）
 

@@ -49,8 +49,8 @@ const payload = {
 |---|---|---|---|---|
 | **MiniMax 2.8-hd**（现在） | 9 档 + 20 种语气词 + 停顿 | 已克隆 `c4clone001` | 已有 key，按量 | ✅ |
 | **Fish Audio S2** | **64+ 种**，文本标记 `[happy]` `[sad]` `[excited]`，含强度修饰、情绪过渡、11 种音效 | 要重新克隆 | 新账号 + 按量 | ✅ |
-| **IndexTTS-2**（B 站开源） | 情绪混合（emotion blending） | 本地零样本克隆 | 免费 | ❌ 本机无 NVIDIA GPU |
-| **CosyVoice / GPT-SoVITS** | 中等 | 本地训练 | 免费 | ❌ 同上 |
+| **IndexTTS-2**（B 站开源） | 情绪混合（emotion blending） | 本地零样本克隆 | 免费 | 🟡 可经 audio.cpp Vulkan（见 [20-tts-selection](20-tts-selection.md)） |
+| **CosyVoice / GPT-SoVITS** | 中等 | 本地训练 | 免费 | 🟡 CosyVoice 可经 Vulkan；GPT-SoVITS 无正式路径 |
 
 Fish Audio 的情绪表达明显更细（[官方文档](https://docs.fish.audio/developer-guide/core-features/emotions)：24 种基础 + 25 种高级 + 语气/音效标记），
 但代价是**重新克隆音色 + 换一家付费**。
