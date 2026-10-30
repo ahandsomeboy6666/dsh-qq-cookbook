@@ -1051,3 +1051,14 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] 语音链路：火山 preview → ok（engine=custom）
 
 **结论：可验收。** 仓库默认无个人配置、无语音；部署者用模板生成自己的配置。
+
+### 2026-10-31 安全端到端演练（T3 出站审计）
+
+- [x] 静态门禁：`check-audit.mjs` / `check-logging.mjs` / `attack-drill.mjs` → 全绿
+- [x] 端到端：通过 `/im-bridge/send` 发送含本机路径的消息
+  - 预期：被拦截、不发出
+  - 实际：outbox job `cancelled`，error =「出站审计拦截：本机路径」
+- [x] 单实例锁：`.bridge.lock` 存在（pid 校验）
+- [x] `node cli.mjs all` → 12/12
+
+**结论：T3/T9 从文档承诺变为运行时强制。**
