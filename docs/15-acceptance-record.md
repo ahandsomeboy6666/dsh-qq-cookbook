@@ -694,3 +694,100 @@ NapCat 一直尝试连这个死地址，刷错误把 OneBot 服务拖挂。关�
 | 私聊人设 49 字 | 图能看、安慰规则没有 |
 | 编造生活细节 | 「换了个新头像」是即兴编的 |
 | 群聊图最多带 3 张 | 防 token 超支，超出的只看得到 `[图片]` |
+
+---
+
+## 2026-10-30 20:30 · 陌生人一键部署实测
+
+### 测法
+
+不看自己这台「已经配好」的机器，而是造一个陌生人的环境：
+
+```
+临时目录
+  .dsh/profiles/desktop/   ← 只放一份 package.json（模拟 DSH 已登录）
+  cookbook/                ← git clone 本仓库
+DSH_HOME 指向临时目录，本机 ~/.dsh 完全不动
+```
+
+### 第一次跑：2 个 FAIL
+
+| 步骤 | 结果 |
+|---|---|
+| clone 插件 | ✅ 03afb9c |
+| 应用本地补丁 | ✅ 但报「5 处改动」（实际已 22+） |
+| 下载 NapCat | ❌ `The operation was aborted due to timeout` |
+| 写 cordis.patch.yml | ❌ `读不到 ...\cordis.patch.yml` |
+| 写入人设 | SKIP（正常，要 DSH 先跑一次） |
+
+耗时 101 秒。
+
+### 修的三个 bug
+
+| # | 现象 | 根因 | 改法 |
+|---|---|---|---|
+| 1 | 「5 处改动」 | 文案硬编码，从只有 5 处补丁时留下的 | 从补丁里数 `diff --git` 与 `@@` |
+| 2 | cordis 写入直接 FAIL | 新机器上文件不存在，代码**只会读不会建** | 不存在就新建，输出标「（新建文件）」 |
+| 3 | NapCat 下载全超时 | 每源只给 20 秒，1MB 的包不够 | 提到 60 秒，失败时报「试过 N 个源」 |
+
+顺带：summary 加一句「重启 DSH 后**再跑一次**脚本」，因为人设要等插件初始化。
+
+### 第二次跑：全过
+
+```
+[OK] clone 插件  03afb9c
+[OK] 应用本地补丁  3 个文件 / 28 处改动
+[OK] 下载 NapCat 安装包  971KB
+[OK] 写 cordis.patch.yml  2 个条目（新建文件）
+[SKIP] 写入人设  settings.json 不存在：先启动 DSH 让插件初始化，再重跑本脚本
+```
+
+耗时 **142 秒**（`--skip-mcp`，不装 300MB QQ）。
+
+产物抽查全部正确：
+
+| 检查 | 结果 |
+|---|---|
+| vendor/index.js 含 `groupIntentToMe` / `directYou` / `_bridgeContextImages` | ✅ |
+| cordis 有 `im-bridge` + `mcp-browser` | ✅ |
+| cordis 的 `allowGroups` 用的是传入的测试群号 | ✅ |
+| NapCat 解压出 `NapCatInstaller.exe` | ✅ |
+
+### 国内网络
+
+GitHub 直连常超时，setup 现在会自动换镜像：
+
+```
+--mirror / GITHUB_MIRROR  →  直连  →  gh-proxy.com  →  ghfast.top  →  ghproxy.net
+```
+
+实测（2026-10-30）：
+
+| 源 | 结果 |
+|---|---|
+| 直连 | 200（本机有代理） |
+| gh-proxy.com | 200 |
+| ghfast.top | 200 |
+| ghproxy.net | **超时**（已降到列表最后） |
+
+镜像 clone 上游插件实测成功（70 秒）。
+
+### 整轮验收
+
+| 项 | 结果 |
+|---|---|
+| `node cli.mjs check` | ✅ PASS 78 / FAIL 0 |
+| `node checks/check-patches.mjs` | ✅ 27/27 |
+| `node checks/check-behavior.mjs` | ✅ 5/5 |
+| 补丁与工作区一致性 | ✅ `git apply --check --reverse` 通过 |
+| 仓库 | 83 文件 / 18 篇文档 / 10 个检查脚本 / 14 张任务卡 |
+
+### 结论
+
+**「拉下来一键部署」是通的**，卡点都在预期内的人工步骤：
+
+```
+装 DSH → 扫码登录 → 小号充 30 元
+```
+
+第一次装会跑两遍（settings.json 要等插件初始化），这是 DSH 的初始化顺序，不是 bug。
