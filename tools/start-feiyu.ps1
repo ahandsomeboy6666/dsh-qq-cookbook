@@ -1,4 +1,4 @@
-﻿# 一键启动肥鱼：NapCat + DSH + 桥接自检
+﻿# 一键启动肥鱼：NapCat + DSH + TTS（Breeze 本地）+ 桥接自检
 $ErrorActionPreference = 'Continue'
 $tools = $PSScriptRoot
 $root = Split-Path -Parent $tools
@@ -6,9 +6,12 @@ $napcatDir = Join-Path $tools 'napcat\NapCat.52892.Shell'
 $napcatQuick = Join-Path $napcatDir 'napcat.quick.bat'
 $dshCandidates = @('E:\dsh桌面端\DeepSeek Harness.exe','C:\Program Files\DeepSeek Harness\DeepSeek Harness.exe')
 $dshExe = $dshCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+$ttsDir = 'E:\workspace\audio.cpp'
+$ttsServer = Join-Path $ttsDir 'audiocpp_server.exe'
+$ttsConfig = Join-Path $ttsDir 'server-all.json'
+$gateway = Join-Path $ttsDir 'gateway.mjs'
 
 function Test-Port([int]$port) {
-  # Test-NetConnection 每次要 1-2 秒；直接用 TcpClient，300ms 超时。
   $client = New-Object System.Net.Sockets.TcpClient
   try {
     $iar = $client.BeginConnect('127.0.0.1', $port, $null, $null)
@@ -26,7 +29,7 @@ function Test-DshRunning {
 function Get-BridgeState {
   $log = Join-Path $env:USERPROFILE '.dsh\im-bridge\bridge.log'
   if (-not (Test-Path $log)) { return 'no-log' }
-  $lines = @(Get-Content $log -Tail 30 -ErrorAction SilentlyContinue)
+  $lines = @(Get-Content $log -Tail 200 -ErrorAction SilentlyContinue)
   $lastConnected = -1; $lastClosed = -1
   for ($i = 0; $i -lt $lines.Count; $i++) {
     if ($lines[$i] -match 'onebot websocket connected') { $lastConnected = $i }
@@ -41,7 +44,7 @@ Write-Host ''
 Write-Host '  肥鱼一键启动' -ForegroundColor Cyan
 Write-Host '  ----------------------------'
 
-Write-Host '[1/3] NapCat（6700）...' -NoNewline
+Write-Host '[1/4] NapCat（6700）...' -NoNewline
 if (Test-Port 6700) {
   Write-Host ' 已在运行' -ForegroundColor Green
 } else {
@@ -65,7 +68,7 @@ if (Test-Port 6700) {
   }
 }
 
-Write-Host '[2/3] DSH 桌面端 ...' -NoNewline
+Write-Host '[2/4] DSH 桌面端 ...' -NoNewline
 if (Test-DshRunning) {
   Write-Host ' 已在运行' -ForegroundColor Green
 } else {
@@ -79,7 +82,26 @@ if (Test-DshRunning) {
   }
 }
 
-Write-Host '[3/3] 桥接状态 ...' -NoNewline
+Write-Host '[3/4] TTS（Breeze 本地）...' -NoNewline
+$ttsServerOk = $true
+if (-not (Test-Port 8080)) {
+  if ((Test-Path $ttsServer) -and (Test-Path $ttsConfig)) {
+    Start-Process -FilePath $ttsServer -ArgumentList @('--config',$ttsConfig,'--log','--log-file','server.log') -WorkingDirectory $ttsDir -WindowStyle Hidden
+    $srvReady = $false
+    for ($i = 0; $i -lt 20; $i++) { Start-Sleep -Seconds 1; if (Test-Port 8080) { $srvReady = $true; break } }
+    if (-not $srvReady) { $ttsServerOk = $false }
+  } else { $ttsServerOk = $false }
+}
+if ($ttsServerOk -and -not (Test-Port 8090)) {
+  if (Test-Path $gateway) { Start-Process -FilePath 'node' -ArgumentList @('gateway.mjs') -WorkingDirectory $ttsDir -WindowStyle Hidden; Start-Sleep -Seconds 2 }
+}
+if ((Test-Port 8080) -and (Test-Port 8090)) {
+  Write-Host '  ok 8080 + 8090' -ForegroundColor Green
+} else {
+  Write-Host '  x 未就绪（看 E:\workspace\audio.cpp\server.log）' -ForegroundColor Red
+}
+
+Write-Host '[4/4] 桥接状态 ...' -NoNewline
 $state = 'unknown'
 for ($i = 0; $i -lt 10; $i++) {
   Start-Sleep -Seconds 2

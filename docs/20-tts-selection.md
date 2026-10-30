@@ -85,3 +85,52 @@
 cd E:\workspace\audio.cpp
 .\audiocpp_server.exe --list-devices   # 应看到 Vulkan0: Radeon RX 9070 XT
 ```
+
+## 六、已跑通记录（2026-10-30）
+
+### 实测环境
+
+| 项 | 值 |
+|---|---|
+| GPU | AMD Radeon RX 9070 XT（Vulkan，fp16/bf16，KHR_coopmat） |
+| 运行时 | audio.cpp v0.9.3（windows-x64-vulkan） |
+| 模型 | Breeze-TTS-2 q8_0（5.08 GB，audio-cpp 官方 GGUF） |
+| ASR（参考文本） | Fun-ASR-Nano 2512 q8_0（1 GB） |
+| 服务 | `audiocpp_server` :8080 + `gateway.mjs` :8090 |
+| 接入 | cheems `voice.engine=custom`，`customUrl=http://127.0.0.1:8090/tts?text={text}` |
+
+### 延迟实测
+
+- Kokoro 82M：1.42 s 生成约 3.6 s 音频
+- Ming 0.5B：1.93 s 生成约 4.5 s 音频
+- Breeze 3B：首请求含加载约 4–6 s，之后约 2–4 s/句（Vulkan）
+
+### 克隆效果（同一句，C4 参考）
+
+| 指标 | MiniMax 原声 | Ming 克隆 | Breeze 克隆 |
+|---|---|---|---|
+| 音高均值 | 245.6 Hz | 231.5 Hz | 227.0 Hz |
+| 音高波动 | 58.1 Hz | 30.5 Hz | 28.2 Hz |
+| 频谱质心 | 1353 Hz | 3886 Hz | 1571 Hz |
+| 语速 | 2.38 音节/s | 4.77 | 2.27 |
+
+Breeze 的音色厚度与语速已接近原声；音高起伏仍偏平（参考音频仅 3.9 s 单句）。
+
+### 后处理（网关内置）
+
+```
+silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,
+volume=2.5,
+apad=pad_dur=0.4
+```
+
+剪掉开头静音、音量 ×2.5、结尾留 0.4 s 空白（否则 QQ 语音播放器会截掉最后一个字）。
+
+### 踩过的坑
+
+1. **HoppouAI 的 GGUF 不能给 audio.cpp 用**（`packed GGUF namespace does not exist: model`），必须用 `audio-cpp/audio.cpp-gguf` 的官方包。
+2. **hf-mirror 对 audio-cpp 仓库限速**约 62 KB/s；换 **ModelScope**（`modelscope.cn/models/audio-cpp/audio.cpp-gguf`）单连接约 1 MB/s。
+3. **Breeze 需要配套文件**：`config.json`、`audio_tokenizer/config.json` 等，缺失会报 `missing model package file`。
+4. **Breeze 克隆必须给 `reference_text`**（参考音频的准确文本），否则 500；用 Fun-ASR 转写得到。
+5. **PowerShell 的 `>>` 不能追加二进制**（会编码转换损坏文件），合并分片用 `cmd /c copy /b`。
+6. **`[IO.File]::WriteAllText` 用相对路径**会解析到进程 cwd 而非 `cd` 的目录，必须绝对路径。
