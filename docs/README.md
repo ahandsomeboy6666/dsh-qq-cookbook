@@ -40,6 +40,7 @@
 | [docs/16-one-command.md](16-one-command.md) | **一个命令恢复**：`tools/setup.mjs` 做什么、不做什么、边界与排查 | 已定 |
 | [docs/17-voice.md](17-voice.md) | **语音（TTS）**：四个引擎、edge-tts 装法、三个坑与验收 | 已生效 |
 | [docs/18-song-cover.md](18-song-cover.md) | **唱歌选型**：人声分离 + 零样本音色转换，两阶段路线与待验证项 | 选型中 |
+| [docs/19-voice-emotion.md](19-voice-emotion.md) | **语音情绪选型**：为什么像念稿（emotion 没传）、MiniMax 的 9 档情绪 + 语气词 + 停顿、三层路线 | 选型中 |
 
 ## 决策记录（ADR）
 
