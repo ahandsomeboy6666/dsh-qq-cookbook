@@ -1,18 +1,19 @@
 {
+  "_comment": "通用模板：不要填真实值，复制成 config.local.json 后再填。config.local.json 不提交（.gitignore）。",
   "qq": {
     "wsUrl": "ws://127.0.0.1:6701",
     "httpUrl": "http://127.0.0.1:6700",
     "accessToken": ""
   },
   "napcat": {
-    "dir": "E:/workspace/dsh-qq-cookbook/tools/napcat/NapCat.52892.Shell",
-    "launcher": "E:/workspace/dsh-qq-cookbook/tools/napcat/NapCat.52892.Shell/launcher-user.bat",
-    "note": "迁移后插件默认找 ~/NapCat 会失败；launcher-user.bat 走无 UAC 的 cmd 分支"
+    "dir": "<你的 NapCat Shell 目录>",
+    "launcher": "<NapCat 启动脚本路径>",
+    "note": "NapCat 目录按你的机器填写；具体版本号随安装包变化"
   },
   "access": {
-    "owner": "632207916",
-    "private": ["632207916"],
-    "groups": ["834195405"]
+    "owner": "<你的 QQ 号>",
+    "private": ["<你的 QQ 号>"],
+    "groups": ["<群号，可留空>"]
   },
   "group": {
     "replyAt": false,
@@ -22,7 +23,7 @@
       "followMinutes": 5,
       "bufferSize": 200,
       "recentLimit": 8,
-      "nicknames": ["肥鱼", "大肥鱼"],
+      "nicknames": ["<机器人昵称>"],
       "note": "被 @ / 命中昵称必唤醒；其余按概率，没抽中的只进缓冲不调模型"
     }
   },
@@ -41,6 +42,12 @@
     "beneficiaries": ["owner", "self"],
     "transfer": false,
     "note": "小号只充余额、不绑卡；受益人只有 owner 与 self；转账/红包永远拒绝"
+  },
+  "voice": {
+    "enabled": false,
+    "engine": "sweet",
+    "note": "默认不接入语音；启用与各方案见 docs/20-tts-selection.md",
+    "customUrl": "http://127.0.0.1:8090/tts?text={text}"
   },
   "tools": {
     "browser": {

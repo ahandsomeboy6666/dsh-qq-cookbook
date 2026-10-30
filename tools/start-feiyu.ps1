@@ -1,7 +1,14 @@
-﻿# 一键启动肥鱼：NapCat + DSH + TTS（Breeze 本地）+ 桥接自检
+﻿# 一键启动肥鱼：NapCat + DSH + TTS（火山引擎豆包语音）+ 桥接自检
 $ErrorActionPreference = 'Continue'
 $tools = $PSScriptRoot
 $root = Split-Path -Parent $tools
+
+# 个人配置：缺失时从模板生成（不覆盖已有）
+$localCfg = Join-Path $root 'config.local.json'
+if (-not (Test-Path $localCfg)) {
+  Copy-Item (Join-Path $root 'config.example.json') $localCfg
+  Write-Host '  [提示] 已生成 config.local.json，请把 <...> 占位符替换成你的值' -ForegroundColor Yellow
+}
 $napcatDir = Join-Path $tools 'napcat\NapCat.52892.Shell'
 $napcatQuick = Join-Path $napcatDir 'napcat.quick.bat'
 $dshCandidates = @('E:\dsh桌面端\DeepSeek Harness.exe','C:\Program Files\DeepSeek Harness\DeepSeek Harness.exe')
@@ -9,7 +16,7 @@ $dshExe = $dshCandidates | Where-Object { Test-Path $_ } | Select-Object -First 
 $ttsDir = 'E:\workspace\audio.cpp'
 $ttsServer = Join-Path $ttsDir 'audiocpp_server.exe'
 $ttsConfig = Join-Path $ttsDir 'server-all.json'
-$gateway = Join-Path $ttsDir 'gateway.mjs'
+$gateway = Join-Path $ttsDir 'gateway-volc.mjs'
 
 function Test-Port([int]$port) {
   $client = New-Object System.Net.Sockets.TcpClient

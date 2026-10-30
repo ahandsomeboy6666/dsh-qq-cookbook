@@ -77,8 +77,8 @@
 |---|---|---|
 | `personae` | `feiyu`（私聊）、`feiyu-group`（群聊） | `preset` 必须是 `standard`，不能是 `whale` |
 | `activePersonaId` | `feiyu` | 全局默认 |
-| `contactProfiles['private:632207916'].personaId` | `feiyu` | 私聊绑定 |
-| `contactProfiles['group:834195405'].personaId` | `feiyu-group` | 群聊绑定 |
+| `contactProfiles['private:<你的QQ号>'].personaId` | `feiyu` | 私聊绑定 |
+| `contactProfiles['group:<群号>'].personaId` | `feiyu-group` | 群聊绑定 |
 
 人设文本与 [roles/](../roles/) 下两个文件保持一致；改面板要同步文件，反之亦然。
 

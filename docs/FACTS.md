@@ -11,8 +11,8 @@
 | F3 | 装插件的 profile | `desktop` | [10-current-plan.md](10-current-plan.md) | `README.md`、`tasks/11-install-cheems.md` | `desktop` | `check-consistency`: profile-web |
 | F4 | 阶段 | D0–D3（M0–M4 已归档） | [tasks/README.md](../tasks/README.md) | `README.md`、`docs/05-roadmap.md`、`docs/04-acceptance.md`、`docs/00-proposal.md` | `D0` | 人工 |
 | F5 | 零花钱授权 | 30/60/300、受益人 owner+self、禁转账 | [config.example.json](../config.example.json) | `docs/10-current-plan.md`、`tasks/13-allowance-browser.md`、`README.md` | `30` | `check-budget` |
-| F6 | 本机 Web 端口 | 桌面端随机（本次 `53800`） | `checks/probe-dsh.mjs` | `AGENTS.md` | `53800` | 探针 |
-| F7 | 语音（TTS）方案 | 火山引擎豆包语音（`seed-icl-2.0` + `S_DfDMiwMj2` 复刻音色 + emotion） | [20-tts-selection.md](20-tts-selection.md) | `README.md`、`AGENTS.md`、`docs/17-voice.md` | `火山` | `check-assets`: FACTS 引用点 |
+| F6 | 本机 Web 端口 | 桌面端随机分配（每次重启不同，不写死） | `checks/probe-dsh.mjs` | `AGENTS.md` | `端口` | 探针 |
+| F7 | 语音（TTS）方案 | 火山引擎豆包语音（`seed-icl-2.0` + `S_DfDMiwMj2`（示例音色 ID）复刻音色 + emotion） | [20-tts-selection.md](20-tts-selection.md) | `README.md`、`AGENTS.md`、`docs/17-voice.md` | `火山` | `check-assets`: FACTS 引用点 |
 
 ## 维护流程
 

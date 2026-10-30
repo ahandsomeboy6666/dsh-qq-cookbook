@@ -15,9 +15,27 @@ import { join } from 'node:path'
 
 const ROOT = import.meta.dirname
 
+import { copyFileSync, existsSync } from 'node:fs'
+
+// init：从模板生成个人配置（不覆盖已有）
+if (process.argv[2] === 'init') {
+  const example = join(ROOT, 'config.example.json')
+  const local = join(ROOT, 'config.local.json')
+  if (existsSync(local)) {
+    console.log('config.local.json 已存在，未覆盖')
+    process.exit(0)
+  }
+  copyFileSync(example, local)
+  console.log('已从模板生成 config.local.json')
+  console.log('请把 <...> 占位符替换成你的值（QQ 号 / 群号 / NapCat 路径 / 音色 ID）')
+  console.log('该文件已在 .gitignore 中，不会提交')
+  process.exit(0)
+}
+
 const SCRIPTS = {
   assets: 'checks/check-assets.mjs',
   consistency: 'checks/check-consistency.mjs',
+  privacy: 'checks/check-privacy.mjs',
   probeDsh: 'checks/probe-dsh.mjs',
   probeOnebot: 'checks/probe-onebot.mjs',
   install: 'checks/check-install.mjs',
@@ -29,7 +47,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency'],
+    items: ['assets', 'consistency', 'privacy'],
     gate: true
   },
   doctor: {
@@ -52,7 +70,8 @@ const LABELS = {
   install: 'cheems 插件',
   persona: '两套人设',
   budget: '零花钱授权',
-  browser: '浏览器能力'
+  browser: '浏览器能力',
+  privacy: '无个人配置泄漏'
 }
 
 function run(item) {

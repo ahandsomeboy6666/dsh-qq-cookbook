@@ -25,3 +25,6 @@ tools/downloads/
 
 # 本地安装的 cheems 源码（11MB，不进仓库）
 vendor/dsh-im-bridge/
+
+# 个人配置（部署时从 config.example.json 生成，不进仓库）
+config.local.json
