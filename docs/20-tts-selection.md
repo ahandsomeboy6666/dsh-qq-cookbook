@@ -245,3 +245,33 @@ Breeze 默认克隆出来很平（音高波动 28 Hz）。加上 `options.instru
 ### 测量注意
 
 体检脚本必须统一重采样到 16 kHz 再比较质心——16k 与 24k 的频率上限不同，直接比会误判为「偏亮 25%」。
+## 七、2026-10-31 最终结论：本地开源 vs 商业 API
+
+### 本地实测（同一参考音频、同一句）
+
+| 模型 | 质心（参考 1428） | 语速（参考 2.09） | 音高波动（参考 34.5） | 结论 |
+|---|---|---|---|---|
+| Breeze q8_0 | 1344 | 2.21 | 32.9 | 音色近，细节差 |
+| Breeze bf16 | 1385 | 1.99 | 44.5 | 更好，但仍不够像 |
+| CosyVoice 3 | 1499 | 1.59 | 37.7 | 音色近，节奏拖 |
+| **IndexTTS 2** | **1394** | 1.89 | 34.6 | **音色最接近（2.4%）** |
+| MiniMax（原版） | 1349 | 2.23 | 48.3 | 基准 |
+
+### 本地模型的硬伤
+
+1. **语速固定**：靠 `duration_scale` 一刀切，不会按内容/情绪自适应。
+2. **情绪控制不可靠**：IndexTTS 2 的 `emotion_text` 方向反了（"sad" 反而升调），`emotion_vector` 第 6 位才对应低落。
+3. **细节丢失**：量化 + 3B 级别模型，气声、咬字、高频泛音不如商业模型。
+
+### 最终选择
+
+**默认用 MiniMax**（`engine=minimax`，voiceId `c4clone001`）：原版音色 + 9 档情绪 + 语速/停顿控制。
+
+本地保留（`engine=custom` 可切回）：IndexTTS 2 + 网关（`gateway.mjs`），适合断网/不想付费时。
+
+### 如果以后想回本地
+
+```powershell
+# 切回本地 IndexTTS 2
+curl -X POST http://127.0.0.1:<DSH端口>/im-bridge/settings -H "Content-Type: application/json" -d '{"voice":{"engine":"custom","customUrl":"http://127.0.0.1:8090/tts?text={text}"}}'
+```
