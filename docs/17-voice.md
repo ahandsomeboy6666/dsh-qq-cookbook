@@ -1,9 +1,9 @@
 # 语音（TTS）怎么开
 
-> 状态：**已生效**（2026-10-27）。`/im-bridge/voice/preview` 返回 `ok:true`，
-> 生成 `sweet-*.mp3`，引擎「轻甜 · 晓伊」。
+> 状态：**可选，默认不接入**（2026-10-31）。不接入 = 没有语音功能，她只发文字。
+> 本机实测方案：火山引擎复刻音色（`custom` 引擎 + `gateway-volc.mjs`），详见 [20-tts-selection](20-tts-selection.md)。
 
-## 一、四个引擎
+## 一、五个引擎
 
 | 引擎 | 依赖 | 音色 | 成本 |
 |---|---|---|---|
@@ -15,17 +15,15 @@
 
 `sweet` 内部就是调 Edge TTS（微软在线语音），音质明显好于 SAPI，所以默认用它。
 
-## 二、开启（当前配置）
+## 二、开启（示例：火山复刻音色）
 
 `~/.dsh/im-bridge/settings.json`：
 
 ```json
 "voice": {
   "enabled": true,
-  "engine": "sweet",
-  "sweetPreset": "sweet-girl",
-  "pythonPath": "E:/dsh桌面端/resources/runtime/primary-runtime/dependencies/python/python.exe",
-  "pythonLib": "C:/Users/麾/.dsh/im-bridge/pylib"
+  "engine": "custom",
+  "customUrl": "http://127.0.0.1:8090/tts?text={text}"
 }
 ```
 

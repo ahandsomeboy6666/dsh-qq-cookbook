@@ -78,6 +78,16 @@ node tools/setup.mjs --qq <主人号> --group <群号或省略> --install-napcat
 | `TODO` | dry-run 或需要人 | 看具体是哪步 |
 | `FAIL` | 出错了 | 按第七节排查，别硬跑下一步 |
 
+### 个人配置（配置分层）
+
+安装完成后生成个人配置（模板 `config.example.json` 不含真实值）：
+
+```powershell
+node cli.mjs init   # 生成 config.local.json（已在 .gitignore，不会提交）
+```
+
+把 `<...>` 占位符换成你刚才的 QQ 号/群号；**音色 ID 在选语音方案时再填**（默认不接入语音）。
+
 ## 四、停下，让用户扫码
 
 ```powershell
@@ -116,7 +126,7 @@ Get-Content "$env:USERPROFILE\.dsh\im-bridge\bridge.log" -Tail 20
 总结要说清：
 
 ```
-已完成：插件 + 补丁 + 配置 + 人设 + 语音依赖
+已完成：插件 + 补丁 + 配置 + 人设 + 语音（可选，默认不接入）
 需要你确认：小号余额是不是只 30 元
 日常启动：双击 tools\一键启动肥鱼.bat
 出问题看：docs/16-one-command.md 第七节
