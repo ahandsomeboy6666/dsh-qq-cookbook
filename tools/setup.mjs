@@ -414,21 +414,23 @@ if (!pkg) {
 
 /* 4. NapCat：检测（五个关键文件齐全才算装好）→ 下载 OneKey → 可选自动安装 */
 let napcatDir = await findNapcat()
+// 先查「目录在但不完整」——这个必须在 DRY 分支之前，
+// 否则 dry-run 只会说「去下载」，把真正的问题（缺 napcat.mjs）藏起来。
+const partialNapcat = napcatDir === '' ? (await napcatCandidates()).filter((d) => napcatMissing(d).length > 0) : []
+for (const dir of partialNapcat) {
+  step('NapCat 本体', 'FAIL', `目录不完整，缺 ${napcatMissing(dir).join('、')}`)
+  console.log(`        ${dir}`)
+  console.log('        NapCat 靠 napcat.quick.bat 里的 NAPCAT_* 环境变量 + launcher 注入，')
+  console.log('        缺 napcat.mjs 会出现「hook 注入了、QQ 也起来了，但 6099/6700/6701 都不监听」。')
+  console.log('        重新解压完整的 NapCat Shell 包（不是 OneKey 安装器）到这个目录即可。')
+}
 if (napcatDir) {
   step('NapCat 本体', 'SKIP', napcatDir)
 } else if (DRY) {
-  step('NapCat 本体', 'TODO', '下载 OneKey（约 1MB），--install-napcat 时自动装 QQ + NapCat（约 300MB）')
+  step('NapCat 本体', 'TODO', partialNapcat.length > 0
+    ? '先修上面那个不完整目录（补全文件，或删掉重装）'
+    : '下载 OneKey（约 1MB），--install-napcat 时自动装 QQ + NapCat（约 300MB）')
 } else {
-  // 目录存在但文件不全：直接告诉缺哪几个，别让人去猜「hook 成功为什么端口不监听」。
-  const partial = (await napcatCandidates()).filter((d) => napcatMissing(d).length > 0)
-  for (const dir of partial) {
-    const missing = napcatMissing(dir)
-    step('NapCat 本体', 'FAIL', `目录不完整，缺 ${missing.join('、')}`)
-    console.log(`        ${dir}`)
-    console.log('        NapCat 靠 napcat.quick.bat 里的 NAPCAT_* 环境变量 + launcher 注入，')
-    console.log('        缺 napcat.mjs 会出现「hook 注入了、QQ 也起来了，但 6099/6700/6701 都不监听」。')
-    console.log('        重新解压完整的 NapCat Shell 包（不是 OneKey 安装器）到这个目录即可。')
-  }
   try {
     const got = await downloadNapcatOneKey()
     step('下载 NapCat 安装包', 'OK', `${(got.bytes / 1024).toFixed(0)}KB → ${got.dir}`)
