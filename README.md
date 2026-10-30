@@ -10,6 +10,15 @@
 
 > **把这个仓库丢给 AI 安装？** 让它先读 [BOOTSTRAP.md](BOOTSTRAP.md)——那是给 agent 的分步手册，写明哪一步必须停下来等人。
 
+> **国内网络注意**：`setup.mjs` 要从 GitHub 克隆插件、下 NapCat，直连经常超时。
+> 脚本会**自动换镜像**（gh-proxy → ghfast → ghproxy），也可以自己指定：
+>
+> ```powershell
+> node tools/setup.mjs --mirror https://gh-proxy.com/      # 或设 GITHUB_MIRROR
+> ```
+>
+> 镜像只影响**下载源**，装完的东西和直连一样。
+
 ## 一分钟选型
 
 | 你的目标 | 选这条路 | 一句话理由 |

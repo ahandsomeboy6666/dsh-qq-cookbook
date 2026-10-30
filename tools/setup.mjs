@@ -16,7 +16,7 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
@@ -26,15 +26,35 @@ import { createInterface } from 'node:readline/promises'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const args = process.argv.slice(2)
+/** 取 `--key value` 的值（函数声明会提升，下面的常量可以先用）。 */
+function argValue(name) {
+  const i = args.indexOf(name)
+  return i >= 0 && args[i + 1] ? args[i + 1] : ''
+}
 const DRY = args.includes('--dry-run')
 const SKIP_MCP = args.includes('--skip-mcp')
 const NO_DOWNLOAD = args.includes('--no-download')
 const INSTALL_NAPCAT = args.includes('--install-napcat')
+// GitHub 在国内经常连不上：直连失败就自动换镜像。
+// 顺序：GITHUB_MIRROR 环境变量 > --mirror 参数 > 直连 > 常用镜像。
+const MIRROR_ARG = argValue('--mirror') || process.env.GITHUB_MIRROR || ''
+// 顺序来自实测（2026-10-30）：gh-proxy / ghfast 通，ghproxy.net 常超时，所以放最后。
+const MIRROR_PREFIXES = [MIRROR_ARG, '', 'https://gh-proxy.com/', 'https://ghfast.top/', 'https://ghproxy.net/']
 // 桌面端官方更新源（来自已安装的 resources/app-update.yml）
 const DSH_FEED = 'https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml'
+
+/** 同一个 GitHub 地址的直连与各镜像写法（去重、保序）。 */
+function githubCandidates(url) {
+  const list = []
+  for (const prefix of MIRROR_PREFIXES) {
+    const candidate = prefix === '' ? url : prefix + url
+    if (!list.includes(candidate)) list.push(candidate)
+  }
+  return list
+}
 const opt = (name, fallback) => {
   const i = args.indexOf(name)
-  return i >= 0 ? args[i + 1] : fallback
+  return i >= 0 && args[i + 1] !== undefined ? args[i + 1] : fallback
 }
 
 const DSH_HOME = process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? homedir(), '.dsh')
@@ -101,8 +121,20 @@ async function downloadNapcatOneKey() {
   const dir = join(ROOT, 'tools', 'napcat')
   await mkdir(dir, { recursive: true })
   const zip = join(dir, 'NapCat.OneKey.zip')
-  const res = await fetch(url)
-  if (!res.ok || !res.body) throw new Error('下载失败 HTTP ' + res.status)
+  // 同样走镜像 fallback：release 下载在国内也经常断。
+  let res = null
+  let lastError = ''
+  for (const candidate of githubCandidates(url)) {
+    try {
+      const attempt = await fetch(candidate, { signal: AbortSignal.timeout(20000) })
+      if (attempt.ok && attempt.body) { res = attempt; break }
+      lastError = `HTTP ${attempt.status}`
+    } catch (error) {
+      lastError = String(error?.message ?? error).slice(0, 120)
+    }
+    console.log(`        下载失败，换下一个源…（${candidate.slice(0, 60)}）`)
+  }
+  if (res === null) throw new Error('下载失败 ' + lastError + '（可加 --mirror 或设 GITHUB_MIRROR）')
   const fh = await open(zip, 'w')
   let bytes = 0
   for await (const chunk of res.body) { await fh.write(chunk); bytes += chunk.length }
@@ -219,10 +251,24 @@ if (!(await exists(VENDOR))) {
     step('clone 插件', 'TODO', `${defaults.pluginRepo} → ${VENDOR}`)
   } else {
     await mkdir(dirname(VENDOR), { recursive: true })
-    const clone = run('git', ['clone', defaults.pluginRepo, VENDOR])
-    if (clone.status !== 0) { step('clone 插件', 'FAIL', (clone.stderr || '').trim().slice(0, 200)); summary(); process.exit(1) }
+    // 直连失败就换镜像；每次失败都清掉半成品目录，否则下一次 clone 会报「已存在」。
+    let lastError = ''
+    let usedMirror = ''
+    let ok = false
+    for (const candidate of githubCandidates(defaults.pluginRepo)) {
+      const clone = run('git', ['clone', '--quiet', candidate, VENDOR])
+      if (clone.status === 0) { usedMirror = candidate; ok = true; break }
+      lastError = (clone.stderr || clone.error?.message || '').trim().slice(0, 200)
+      rmSync(VENDOR, { recursive: true, force: true })
+      if (!DRY) console.log(`        直连失败，换下一个源…（${candidate.slice(0, 60)}）`)
+    }
+    if (!ok) {
+      step('clone 插件', 'FAIL', lastError || '所有源都失败')
+      console.log('        可以指定镜像：--mirror https://ghproxy.net/   或设 GITHUB_MIRROR')
+      summary(); process.exit(1)
+    }
     run('git', ['checkout', '--quiet', defaults.pluginBaseline], VENDOR)
-    step('clone 插件', 'OK', defaults.pluginBaseline)
+    step('clone 插件', 'OK', usedMirror === defaults.pluginRepo ? defaults.pluginBaseline : `${defaults.pluginBaseline}（走镜像）`)
   }
 } else {
   step('clone 插件', 'SKIP', '已存在')

@@ -64,9 +64,22 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 | `--skip-mcp` | 不装 Playwright MCP |
 | `--install-napcat` | 缺 NapCat 时自动跑官方安装器（约 300MB） |
 | `--no-download` | DSH 没装时只给地址，不下载 |
+| `--mirror <前缀>` | 指定 GitHub 镜像前缀，如 `https://gh-proxy.com/`；也可用环境变量 `GITHUB_MIRROR` |
 
 **幂等**：重复执行只跳过；改文件前备份 `*.bak-<时间戳>`。
 **不覆盖已有语音配置**：已经配了 MiniMax/Breeze 的，只补 Python 路径，不改引擎。
+
+### 国内网络
+
+`setup.mjs` 有两处要访问 GitHub，都会**自动换镜像**（顺序来自实测）：
+
+```
+--mirror / GITHUB_MIRROR  →  直连  →  gh-proxy.com  →  ghfast.top  →  ghproxy.net
+```
+
+每失败一次会打印「换下一个源…」，最后一行告诉你用了哪个。镜像只改下载源，装完内容一致。
+
+实测（2026-10-30）：`gh-proxy.com`、`ghfast.top` 通；`ghproxy.net` 常超时。
 
 ## 五、做不到的三件
 
