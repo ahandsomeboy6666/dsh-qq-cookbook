@@ -104,13 +104,38 @@ async function findDsh() {
 }
 
 /** 找已安装的 NapCat 目录（含 napcat.bat 的 *Shell* 子目录）；没有返回空串 */
-async function findNapcat() {
+// NapCat 要真能跑起来，这五个文件缺一不可：
+//   napcat.mjs             主程序（hook 注入成功但没它，端口永远不会监听）
+//   NapCatWinBootMain.exe  launcher（quick.bat 调的就是它）
+//   NapCatWinBootHook.dll  注入器
+//   loadNapCat.js          注入后加载的脚本
+//   QQ.exe                 宿主（launcher 写死了 %cd%\QQ.exe）
+const NAPCAT_REQUIRED = ['napcat.mjs', 'NapCatWinBootMain.exe', 'NapCatWinBootHook.dll', 'loadNapCat.js', 'QQ.exe']
+
+/** 返回缺失的关键文件列表；空数组 = 这个目录能跑。 */
+function napcatMissing(dir) {
+  if (dir === '') return [...NAPCAT_REQUIRED]
+  return NAPCAT_REQUIRED.filter((f) => !existsSync(join(dir, f)))
+}
+
+/** 目录"像 NapCat"但可能不完整——用来给出具体缺哪几个文件。 */
+async function napcatCandidates() {
   const base = join(ROOT, 'tools', 'napcat')
-  if (!(await exists(base))) return ''
+  if (!(await exists(base))) return []
+  const out = []
   for (const entry of await readdir(base, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     const dir = join(base, entry.name)
-    if ((await exists(join(dir, 'napcat.bat'))) || (await exists(join(dir, 'launcher-user.bat')))) return dir
+    const looks = NAPCAT_REQUIRED.some((f) => existsSync(join(dir, f))) || existsSync(join(dir, 'napcat.bat')) || existsSync(join(dir, 'launcher-user.bat'))
+    if (looks) out.push(dir)
+  }
+  return out
+}
+
+/** 只返回「五个文件齐全」的目录；不完整的不算装好。 */
+async function findNapcat() {
+  for (const dir of await napcatCandidates()) {
+    if (napcatMissing(dir).length === 0) return dir
   }
   return ''
 }
@@ -387,13 +412,23 @@ if (!pkg) {
   }
 }
 
-/* 4. NapCat：检测 → 下载 OneKey 安装器 → 可选自动安装 */
+/* 4. NapCat：检测（五个关键文件齐全才算装好）→ 下载 OneKey → 可选自动安装 */
 let napcatDir = await findNapcat()
 if (napcatDir) {
   step('NapCat 本体', 'SKIP', napcatDir)
 } else if (DRY) {
   step('NapCat 本体', 'TODO', '下载 OneKey（约 1MB），--install-napcat 时自动装 QQ + NapCat（约 300MB）')
 } else {
+  // 目录存在但文件不全：直接告诉缺哪几个，别让人去猜「hook 成功为什么端口不监听」。
+  const partial = (await napcatCandidates()).filter((d) => napcatMissing(d).length > 0)
+  for (const dir of partial) {
+    const missing = napcatMissing(dir)
+    step('NapCat 本体', 'FAIL', `目录不完整，缺 ${missing.join('、')}`)
+    console.log(`        ${dir}`)
+    console.log('        NapCat 靠 napcat.quick.bat 里的 NAPCAT_* 环境变量 + launcher 注入，')
+    console.log('        缺 napcat.mjs 会出现「hook 注入了、QQ 也起来了，但 6099/6700/6701 都不监听」。')
+    console.log('        重新解压完整的 NapCat Shell 包（不是 OneKey 安装器）到这个目录即可。')
+  }
   try {
     const got = await downloadNapcatOneKey()
     step('下载 NapCat 安装包', 'OK', `${(got.bytes / 1024).toFixed(0)}KB → ${got.dir}`)
@@ -417,17 +452,7 @@ if (napcatDir) {
     step('安装 NapCat', 'TODO', '双击 tools/napcat/NapCatInstaller.exe，或加 --install-napcat')
   }
 }
-// 4.4 完整性检查：NapCat 必须带自己的 QQ。
-// 不复制系统 QQ——那是"凑合能用"，版本与 hook 对不上还是会崩，且掩盖了真问题。
-{
-  if (napcatDir !== '' && !existsSync(join(napcatDir, 'QQ.exe'))) {
-    step('NapCat 自带 QQ', 'FAIL', `目录里没有 QQ.exe（${napcatDir}）`)
-    console.log('        NapCat 只认自己目录里的 QQ.exe；用它自带的版本，hook 才对得上。')
-    console.log('        系统里装的 QQ 不要拿来凑：版本一错，注入即崩（QQNT.dll / 0x80000003）。')
-    console.log('        重新跑：node tools/setup.mjs --install-napcat')
-    console.log('        （OneKey 会下完整包，QQ 跟 NapCat 一起解压进这个目录）')
-  }
-}
+// 4.4 完整性已在 findNapcat 里保证（五个文件缺一不可），这里只报实际注入的 QQ 版本。
 const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.bat')
 
 /* 4.5 QQ 版本 vs NapCat 版本：对不上就会「一注入就崩」（0x80000003） */
