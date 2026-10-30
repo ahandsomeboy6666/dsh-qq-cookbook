@@ -8,7 +8,7 @@
 >
 > 与 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 无代码关系，只引用其已验证结论作为事实基线。
 >
-> 语音：本地 **Breeze-TTS-2**（Vulkan）+ C4 音色克隆 + 情绪指令，见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
+> 语音：**火山引擎豆包语音**（复刻音色 + emotion），见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
 
 > **把这个仓库丢给 AI 安装？** 让它先读 [BOOTSTRAP.md](BOOTSTRAP.md)——那是给 agent 的分步手册，写明哪一步必须停下来等人。
 

@@ -11,6 +11,7 @@
 | `sapi` | Windows 自带 | Microsoft Huihui，机械 | 免费离线 |
 | `minimax` | MiniMax API Key | 可定制，情绪强 | 付费 |
 | `breeze` | Breeze API Key 或自建 vLLM | 可定制 | 付费/自建 |
+| **custom（火山）** | 本地网关 `gateway-volc.mjs` + 火山 API Key | `S_DfDMiwMj2` 复刻音色 + emotion | ≈¥10/万字 |
 
 `sweet` 内部就是调 Edge TTS（微软在线语音），音质明显好于 SAPI，所以默认用它。
 
