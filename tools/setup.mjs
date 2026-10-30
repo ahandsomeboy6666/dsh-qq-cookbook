@@ -16,7 +16,7 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
@@ -114,6 +114,63 @@ async function findNapcat() {
   }
   return ''
 }
+
+/**
+ * NapCat 实际注入的是 `napcat.quick.bat` 里写死的 `%cd%\QQ.exe`——
+ * 也就是它自己目录里的 QQ，而不是系统里装的那个。
+ * 所以判断的是「目录里有没有自带 QQ」，不是「系统 QQ 版本是否相等」。
+ */
+function napcatBundledQQ(dir) {
+  if (!dir) return ''
+  const exe = join(dir, 'QQ.exe')
+  if (!existsSync(exe)) return ''
+  try {
+    const v = spawnSync('powershell.exe', ['-NoProfile', '-Command',
+      `(Get-Item '${exe}').VersionInfo.FileVersion`], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
+    return String(v.stdout ?? '').trim()
+  } catch {
+    return '未知版本'
+  }
+}
+
+/** NapCat 补丁描述里声明的 QQ 版本（qqnt.json），仅作参考，不当作硬性要求。 */
+function napcatPatchQQVersion(dir) {
+  if (!dir) return ''
+  try {
+    const raw = readFileSync(join(dir, 'qqnt.json'), 'utf8')
+    return String(JSON.parse(raw)?.version ?? '')
+  } catch {
+    return ''
+  }
+}
+
+/** 本机装的 QQ 版本：注册表优先，退回到常见安装路径的 exe 版本。 */
+function detectInstalledQQ() {
+  // Node 没有原生注册表 API，用 PowerShell 读最稳。
+  const ps = spawnSync('powershell.exe', ['-NoProfile', '-Command',
+    "$p=Get-ItemProperty 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'QQ' } | Select-Object -First 1; if($p){$p.DisplayVersion}"],
+  { encoding: 'utf8', windowsHide: true, timeout: 20000 })
+  const fromReg = String(ps.stdout ?? '').trim()
+  if (/^\d+\.\d+\.\d+/.test(fromReg)) return fromReg
+  for (const exe of ['D:\\Program Files\\QQ.exe', 'C:\\Program Files\\Tencent\\QQNT\\QQ.exe', 'C:\\Program Files (x86)\\Tencent\\QQNT\\QQ.exe']) {
+    if (!existsSync(exe)) continue
+    try {
+      const v = spawnSync('powershell.exe', ['-NoProfile', '-Command',
+        `(Get-Item '${exe}').VersionInfo.FileVersion`], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
+      const got = String(v.stdout ?? '').trim()
+      if (/^\d+\.\d+\.\d+/.test(got)) return got
+    } catch { /* ignore */ }
+  }
+  return ''
+}
+
+/** 9.9.35-52892 与 9.9.35.52892 视为同版本；只比前三段。 */
+function sameQQVersion(a, b) {
+  const pick = (v) => String(v).split(/[-.]/).slice(0, 3).join('.')
+  return pick(a) === pick(b)
+}
+
+/** 系统里装的 QQ 版本（只用于提示，不影响 NapCat 注入哪个 QQ）。 */
 
 /** 下载 NapCat 的 OneKey 包（约 1MB，内部是安装器）并解压到 tools/napcat */
 async function downloadNapcatOneKey() {
@@ -352,6 +409,28 @@ if (napcatDir) {
   }
 }
 const napcatLauncher = napcatDir === '' ? '' : join(napcatDir, 'launcher-user.bat')
+
+/* 4.5 QQ 版本 vs NapCat 版本：对不上就会「一注入就崩」（0x80000003） */
+{
+  const bundled = napcatBundledQQ(napcatDir)
+  const patchVer = napcatPatchQQVersion(napcatDir)
+  const systemQQ = detectInstalledQQ()
+  if (napcatDir === '') {
+    step('NapCat 自带 QQ', 'SKIP', '还没装 NapCat，装好后重跑本脚本会检查')
+  } else if (bundled === '') {
+    // 关键：没有自带 QQ 时，launcher 会去找系统 QQ——那里的版本和 hook 对不上就会崩。
+    step('NapCat 自带 QQ', 'FAIL', `目录里没有 QQ.exe（${napcatDir}）`)
+    console.log('        NapCat 的 launcher 启动的是它自己目录里的 QQ.exe；缺了就会退到系统 QQ，')
+    console.log('        版本对不上会在 1 秒内崩（QQNT.dll / 0x80000003）。')
+    console.log('        用 --install-napcat 重装 OneKey，或手动把匹配版本的 QQ 解压到这个目录。')
+  } else {
+    const patchNote = patchVer === '' ? '' : `，补丁面向 ${patchVer}`
+    step('NapCat 自带 QQ', 'OK', `${bundled}（实际注入的就是它${patchNote}）`)
+    if (systemQQ !== '' && !sameQQVersion(systemQQ, bundled)) {
+      console.log(`        提示：系统里的 QQ 是 ${systemQQ}，NapCat 不会用它，互不影响。`)
+    }
+  }
+}
 
 /* 5. cordis.patch.yml：im-bridge 配置 + mcp-browser */
 // 新机器上 DSH 还没跑过，这个文件可能压根不存在——那就当空文件新建，不能直接 FAIL。

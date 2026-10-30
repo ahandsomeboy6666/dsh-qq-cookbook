@@ -139,23 +139,39 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 
 ### QQ 启动即崩（0x80000003）
 
-2026-10-30 实测到一次：NapCat 的 `qqnt.json` 写 `9.9.22-40990`，而 OneKey 装成了 `9.9.33-52230`，
-注入瞬间 `QQNT.dll` 触发 int3 断点，QQ 自杀（这是**自检失败主动退出**，不是文件损坏、也不是权限问题）。
+2026-10-30 实测到一次。先说结论：**NapCat 只认自己目录里的 `QQ.exe`**。
+
+`napcat.quick.bat` 的最后一行写死了：
+
+```bat
+NapCatWinBootMain.exe "%cd%\QQ.exe" ... -q <QQ号>
+```
+
+所以它注入的是 `tools/napcat/<版本>/QQ.exe`，**不是**你系统里装的那个 QQ。
+两者互不影响，但**目录里缺 QQ.exe 时**就会退到系统 QQ——那里的版本和 hook 对不上，一注入就崩。
 
 判断特征：
 
 ```
 出错应用程序: QQ.exe
 出错模块:     QQNT.dll
-异常代码:     0x80000003    ← int3，固定偏移
+异常代码:     0x80000003    ← int3，QQ 自检发现被篡改后主动退出
 ```
 
-三条路（按推荐度）：
+`setup.mjs` 现在会检查这一项：
 
-| 路 | 做法 | 代价 |
-|---|---|---|
-| **对齐版本** | 装与 NapCat 匹配的 QQ（看 `qqnt.json` 里的版本号），并**关掉 QQ 自动更新** | 最根治，但要找得到那个版本的安装包 |
-| **换协议端** | 用 NapCatQQ-Desktop 桌面版（自带托管，不手动注入）或 Lagrange | 省事，但第三方协议端有封号风险 |
-| **Docker** | 容器里跑 Linux 版 NapCat + QQ，完全绕开 Windows 注入 | 多一个开机要起的服务，拉 2–3GB 镜像 |
+```
+[OK]   NapCat 自带 QQ  9.9.33.52230（实际注入的就是它，补丁面向 9.9.22-40990）
+[FAIL] NapCat 自带 QQ  目录里没有 QQ.exe
+```
 
-> 装完 QQ 后**第一件事是关自动更新**——否则隔天升级到新版本，NapCat 又会崩。
+看到 FAIL 就补 QQ 到目录里：
+
+| 做法 | 命令/动作 |
+|---|---|
+| 重装 OneKey | `node tools/setup.mjs --install-napcat` |
+| 手动 | 把匹配版本的 QQ 解压进 `tools/napcat/<版本>/`，确认里面有 `QQ.exe` |
+| 换协议端 | NapCatQQ-Desktop / Lagrange（不注入，另开一个进程） |
+
+> `qqnt.json` 里的 `version` 只是补丁的描述，和实际注入的 QQ 版本可以不同——
+> 本机就是「补丁写 9.9.22、实际跑 9.9.33」在正常工作。**判断依据永远是"目录里有没有 QQ.exe"。**
