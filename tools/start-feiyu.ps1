@@ -89,7 +89,7 @@ if (Test-DshRunning) {
   }
 }
 
-Write-Host '[3/4] TTS（Breeze 本地）...' -NoNewline
+Write-Host '[3/4] TTS（火山引擎豆包语音）...' -NoNewline
 $ttsServerOk = $true
 if (-not (Test-Port 8080)) {
   if ((Test-Path $ttsServer) -and (Test-Path $ttsConfig)) {
