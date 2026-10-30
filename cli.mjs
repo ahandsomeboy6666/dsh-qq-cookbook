@@ -36,6 +36,9 @@ const SCRIPTS = {
   assets: 'checks/check-assets.mjs',
   consistency: 'checks/check-consistency.mjs',
   privacy: 'checks/check-privacy.mjs',
+  audit: 'checks/check-audit.mjs',
+  logging: 'checks/check-logging.mjs',
+  drill: 'checks/attack-drill.mjs',
   probeDsh: 'checks/probe-dsh.mjs',
   probeOnebot: 'checks/probe-onebot.mjs',
   install: 'checks/check-install.mjs',
@@ -47,7 +50,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy'],
+    items: ['assets', 'consistency', 'privacy', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -71,7 +74,10 @@ const LABELS = {
   persona: '两套人设',
   budget: '零花钱授权',
   browser: '浏览器能力',
-  privacy: '无个人配置泄漏'
+  privacy: '无个人配置泄漏',
+  audit: '出站审计',
+  logging: '日志无密钥',
+  drill: '攻击演练（静态）'
 }
 
 function run(item) {
