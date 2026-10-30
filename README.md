@@ -8,7 +8,7 @@
 >
 > 与 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 无代码关系，只引用其已验证结论作为事实基线。
 >
-> 语音：**火山引擎豆包语音**（复刻音色 + emotion），见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
+> 语音（**可选，默认关闭**）：效果最好是**火山引擎豆包语音**（复刻音色 + emotion，付费）；免费可选 Edge TTS 或本地模型。见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
 
 > **把这个仓库丢给 AI 安装？** 让它先读 [BOOTSTRAP.md](BOOTSTRAP.md)——那是给 agent 的分步手册，写明哪一步必须停下来等人。
 

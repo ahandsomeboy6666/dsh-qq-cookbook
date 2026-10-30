@@ -10,7 +10,7 @@
 
 **当前方案（已拍板）**：`cheems135/dsh-qq-bridge` 插件 + NapCat，主线是**部署与验收**，不是自己写桥接。见 [docs/10-current-plan.md](docs/10-current-plan.md)。
 
-语音：**火山引擎豆包语音**（复刻音色 + emotion），见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
+语音（**可选，默认关闭**）：效果最好是**火山引擎豆包语音**（复刻音色 + emotion，付费）；免费可选 Edge TTS 或本地模型。见 [docs/20-tts-selection.md](docs/20-tts-selection.md)。
 
 ```
 QQ 客户端 ──► OneBot v11 协议端 ──► 桥接进程 ──► DSH（Web / ACP / SDK）
