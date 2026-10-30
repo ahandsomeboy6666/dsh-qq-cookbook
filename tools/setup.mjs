@@ -71,7 +71,7 @@ let GROUP = String(opt('--group', defaults.group ?? '')).trim()
 // 交互补齐：只有真实终端才问，避免脚本/CI 卡住
 if (!DRY && (!QQ || GROUP === '') && process.stdin.isTTY) {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
-  if (!QQ) QQ = (await rl.question('  你的 QQ 号（白名单，只回这个人）：')).trim()
+  if (!QQ) QQ = (await rl.question('  你的 QQ 号（主人号 / 白名单，只回这个人；不是机器人小号）：')).trim()
   if (GROUP === '') GROUP = (await rl.question('  要接的 QQ 群号（回车跳过，不接群）：')).trim()
   rl.close()
 }
@@ -196,7 +196,7 @@ async function backup(file) {
 console.log('\n一键恢复 QQ 桥接\n')
 console.log(`  项目目录   ${ROOT}`)
 console.log(`  DSH_HOME   ${DSH_HOME}`)
-console.log(`  QQ / 群    ${QQ || '(未填)'} / ${GROUP || '(不接群)'}`)
+console.log(`  主人号 / 群  ${QQ || '(未填)'} / ${GROUP || '(不接群)'}`)
 if (DRY) console.log('  模式       dry-run（不写文件）')
 console.log('')
 

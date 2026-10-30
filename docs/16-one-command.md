@@ -58,7 +58,7 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 
 | 参数 | 作用 |
 |---|---|
-| `--qq <号>` | 必填（非交互时），白名单 |
+| `--qq <号>` | 必填（非交互时）。**主人号**（白名单）——它不是 NapCat 扫码用的号 |
 | `--group <号>` | 可选，不填 = 不接群 |
 | `--dry-run` | 只报告，不写文件；缺 QQ 时用占位号展示 |
 | `--skip-mcp` | 不装 Playwright MCP |
@@ -135,3 +135,27 @@ node tools/setup.mjs --qq 123456789 --group 987654321
 | 启动脚本报 `Unexpected token '{'` | ps1 被编辑器改成无 BOM，PowerShell 按 GBK 解码中文 | 重新以 UTF-8 with BOM 保存 ps1 |
 | 搜索报 `402 Insufficient Balance` 但平台有余额 | 账号登录态 token 不适用于搜索端点（实测），账号余额是另一个池 | 给 `web-search-deepseek` 配 `apiKey`（见 [docs/15](15-acceptance-record.md) 00:35 节）；key 只存本机 |
 | 群里说「没权限联网」 | 群聊工具被 guard 一刀切拒绝 | 见 [docs/12](12-bridge-patches.md) P11：群聊 guard 放行 `web_search`/`web_fetch` |
+| **NapCat 拉起 QQ 后 1 秒内崩**（`QQ.exe 0x80000003`） | NapCat 的 hook 与 QQ 版本不匹配：`qqnt.json` 写的版本 ≠ 实际装的 QQ | 见下节 |
+
+### QQ 启动即崩（0x80000003）
+
+2026-10-30 实测到一次：NapCat 的 `qqnt.json` 写 `9.9.22-40990`，而 OneKey 装成了 `9.9.33-52230`，
+注入瞬间 `QQNT.dll` 触发 int3 断点，QQ 自杀（这是**自检失败主动退出**，不是文件损坏、也不是权限问题）。
+
+判断特征：
+
+```
+出错应用程序: QQ.exe
+出错模块:     QQNT.dll
+异常代码:     0x80000003    ← int3，固定偏移
+```
+
+三条路（按推荐度）：
+
+| 路 | 做法 | 代价 |
+|---|---|---|
+| **对齐版本** | 装与 NapCat 匹配的 QQ（看 `qqnt.json` 里的版本号），并**关掉 QQ 自动更新** | 最根治，但要找得到那个版本的安装包 |
+| **换协议端** | 用 NapCatQQ-Desktop 桌面版（自带托管，不手动注入）或 Lagrange | 省事，但第三方协议端有封号风险 |
+| **Docker** | 容器里跑 Linux 版 NapCat + QQ，完全绕开 Windows 注入 | 多一个开机要起的服务，拉 2–3GB 镜像 |
+
+> 装完 QQ 后**第一件事是关自动更新**——否则隔天升级到新版本，NapCat 又会崩。
