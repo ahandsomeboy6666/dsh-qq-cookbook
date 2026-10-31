@@ -37,8 +37,16 @@
 ```powershell
 git clone https://github.com/ahandsomeboy6666/dsh-qq-cookbook.git
 cd dsh-qq-cookbook
+npm install                # 装 yaml（setup 写 cordis.patch.yml 要用；漏了会自动补装）
 node tools/setup.mjs      # 会问你 QQ 号 / 群号
 ```
+
+> **桌面端装在非默认位置？** setup 会按「运行中的进程 → 注册表 → 各盘常见目录」自动找，
+> 找不到才去下 290MB 安装包。确实要指定就设环境变量：
+>
+> ```powershell
+> $env:DSH_DESKTOP_DIR = "D:\Program Files\dsh"
+> ```
 
 > **NapCat 的 QQ 从哪来**：`NapCat.Shell.zip` 只含 Shell 层，**不含 QQ.exe**。setup 补完 Shell 后会提示缺 QQ.exe，两种补法：
 >

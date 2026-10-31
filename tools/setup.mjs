@@ -16,10 +16,9 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import YAML from 'yaml'
 import { join, dirname, relative } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -87,21 +86,118 @@ function step(name, status, detail = '') {
 }
 async function exists(p) { try { await access(p); return true } catch { return false } }
 
-// 设了 DSH_DESKTOP_DIR 就只认它（方便多安装路径 / 测试未安装分支）
-const DSH_CANDIDATES = process.env.DSH_DESKTOP_DIR
-  ? [process.env.DSH_DESKTOP_DIR]
-  : [
-      'E:\\dsh桌面端',
-      process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'DeepSeek Harness') : '',
-      process.env.ProgramFiles ? join(process.env.ProgramFiles, 'DeepSeek Harness') : '',
-      process.env['ProgramFiles(x86)'] ? join(process.env['ProgramFiles(x86)'], 'DeepSeek Harness') : '',
-    ].filter(Boolean)
+/**
+ * yaml 只在写 cordis.patch.yml 时用到。
+ * 做成动态加载 + 缺包自动装：否则没跑过 npm install 的人第一步就撞
+ * "Cannot find package 'yaml'"，而这个仓库的安装说明本来就假设「一条命令」。
+ */
+let YAML_CACHE = null
+async function ensureYaml() {
+  if (YAML_CACHE) return YAML_CACHE
+  try {
+    YAML_CACHE = (await import('yaml')).default
+    return YAML_CACHE
+  } catch { /* 没装，下面装 */ }
+  console.log('  缺少依赖 yaml，正在 npm install…')
+  const r = spawnSync('npm', ['install', '--no-audit', '--no-fund'], {
+    cwd: ROOT, encoding: 'utf8', shell: true, timeout: 10 * 60 * 1000,
+  })
+  if (r.status !== 0) {
+    throw new Error('npm install 失败，请手动在仓库目录跑一次 npm install（' + String(r.stderr ?? '').slice(0, 120) + '）')
+  }
+  YAML_CACHE = (await import('yaml')).default
+  return YAML_CACHE
+}
+
+// 桌面端可能装在任一路径（E:\dsh桌面端、D:\Program Files\dsh、自定义目录…）。
+// 硬编码候选路径不够用——陌生人装在别处会被误判成「没装」，然后去下 290MB 安装包。
+// 所以按可靠性从高到低找：环境变量 → 运行中的进程 → 注册表 → 各盘常见位置。
+const DSH_DIR_HINTS = ['dsh', 'DeepSeek Harness', 'DeepSeekHarness', 'deepseek-harness']
+
+/** 这个目录是不是 DSH 桌面端安装目录 */
+function isDshDir(dir) {
+  if (!dir) return false
+  if (existsSync(join(dir, 'resources', 'app.asar'))) return true
+  if (existsSync(join(dir, 'resources', 'app-update.yml'))) return true
+  try {
+    for (const name of readdirSync(dir)) {
+      if (!/\.exe$/i.test(name)) continue
+      if (/dsh|deepseek|harness/i.test(name)) return true
+    }
+  } catch { /* 目录不存在或无权限 */ }
+  return false
+}
+
+/** 从正在运行的进程反查：桌面端开着的时候最可靠 */
+function dshDirFromProcess() {
+  const cmd = `Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.ExecutablePath -match '(?i)dsh|deepseek' } | Select-Object -ExpandProperty ExecutablePath`
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', windowsHide: true, timeout: 20000 })
+  const seen = new Set()
+  for (const raw of String(r.stdout ?? '').split(/\r?\n/)) {
+    const p = raw.trim()
+    if (p === '') continue
+    for (const dir of [dirname(p), dirname(dirname(p))]) {
+      if (seen.has(dir)) continue
+      seen.add(dir)
+      if (isDshDir(dir)) return dir
+    }
+  }
+  return ''
+}
+
+/** 从注册表的卸载项反查（安装过就一定有） */
+function dshDirsFromRegistry() {
+  const cmd = `Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match '(?i)dsh|deepseek|harness' } | ForEach-Object { $_.InstallLocation; $_.DisplayIcon }`
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', windowsHide: true, timeout: 20000 })
+  const out = []
+  for (const raw of String(r.stdout ?? '').split(/\r?\n/)) {
+    let p = raw.trim().replace(/^"|"$/g, '')
+    if (p === '') continue
+    if (/\.exe$/i.test(p)) p = dirname(p)
+    if (isDshDir(p)) out.push(p)
+  }
+  return out
+}
+
+/** 扫各盘符的常见安装位置（只扫一层，不递归，很快） */
+function dshDirsFromDrives() {
+  const out = []
+  const roots = []
+  for (const letter of 'CDEFGH') {
+    roots.push(`${letter}:\\Program Files`, `${letter}:\\Program Files (x86)`, `${letter}:\\`, `${letter}:\\Programs`, `${letter}:\\Apps`)
+  }
+  if (process.env.LOCALAPPDATA) roots.push(join(process.env.LOCALAPPDATA, 'Programs'))
+  if (process.env.USERPROFILE) roots.push(process.env.USERPROFILE)
+  for (const root of roots) {
+    for (const name of DSH_DIR_HINTS) {
+      const dir = join(root, name)
+      if (isDshDir(dir)) out.push(dir)
+    }
+  }
+  return out
+}
 
 /** 找已安装的桌面端目录；找不到返回空串 */
 async function findDsh() {
-  for (const dir of DSH_CANDIDATES) {
-    if (await exists(join(dir, 'DeepSeek Harness.exe'))) return dir
-    if (await exists(join(dir, 'resources', 'app-update.yml'))) return dir
+  // 显式指定优先，但设错了不该直接判死——继续往下找。
+  const envDir = process.env.DSH_DESKTOP_DIR
+  if (envDir) {
+    if (isDshDir(envDir)) return envDir
+    console.log(`  提示：DSH_DESKTOP_DIR 指向的目录不像桌面端（${envDir}），继续自动查找…`)
+  }
+  const found = dshDirFromProcess() || dshDirsFromRegistry()[0] || dshDirsFromDrives()[0] || ''
+  if (found) return found
+  // 兜底：老候选路径（自定义安装可能不写注册表、也没在跑）
+  for (const dir of [
+    'E:\\dsh桌面端',
+    'D:\\Program Files\\dsh',
+    'D:\\dsh',
+    'E:\\dsh',
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'DeepSeek Harness') : '',
+    process.env.ProgramFiles ? join(process.env.ProgramFiles, 'DeepSeek Harness') : '',
+    process.env['ProgramFiles(x86)'] ? join(process.env['ProgramFiles(x86)'], 'DeepSeek Harness') : '',
+  ].filter(Boolean)) {
+    if (isDshDir(dir)) return dir
   }
   return ''
 }
@@ -287,12 +383,33 @@ async function downloadNapcatOneKey() {
 function runNapcatInstaller(dir) {
   const installer = join(dir, 'NapCatInstaller.exe')
   if (!existsSync(installer)) return { status: -1, stderr: '找不到 NapCatInstaller.exe' }
+  // 安装器是 GUI 程序：没有管理员权限时会静默卡住（无窗口、无进度）。
+  // 所以给 8 分钟上限——真在下载 300MB 也不至于超时，卡死则尽快暴露。
   return spawnSync(installer, [], {
     cwd: dir,
     encoding: 'utf8',
     windowsHide: false,
-    timeout: 30 * 60 * 1000,
+    timeout: 8 * 60 * 1000,
   })
+}
+
+/** 安装器失败时，明确告诉人下一步怎么做（别只丢一句 FAIL） */
+function printNapcatInstallerHelp(dir) {
+  console.log('')
+  console.log('        安装器没能装好。常见原因是它需要管理员权限，或下载 QQ 时网络中断。')
+  console.log('        三条路，任选一条：')
+  console.log('')
+  console.log('        ① 右键 tools/napcat/NapCatInstaller.exe → 以管理员身份运行')
+  console.log('           装完再跑一次 node tools/setup.mjs --qq <你的号>')
+  console.log('')
+  console.log('        ② 已经有 QQ 了？只补 NapCat 的 JS 层（35MB，不需要管理员）：')
+  console.log('           下载 https://github.com/NapNeko/NapCatQQ/releases/latest 的 NapCat.Shell.zip')
+  console.log(`           解压到 ${dir}（覆盖同名文件，保留里面的 QQ.exe 和 versions/）`)
+  console.log('           然后重跑本脚本 —— 它会检测五个关键文件是否齐全')
+  console.log('')
+  console.log('        ③ 关掉杀毒软件再试一次（有的会把注入器当威胁拦掉）')
+  console.log('')
+  console.log('        别去改 QQ 的 package.json 或 application.asar——那会触发完整性校验，QQ 直接启动不了。')
 }
 
 /** 从官方 feed 下载安装包并校验 sha512；已下载过则直接复用 */
@@ -602,15 +719,17 @@ if (napcatDir) {
     step('下载 NapCat 安装包', 'FAIL', String(error?.message ?? error).slice(0, 140))
   }
   if (INSTALL_NAPCAT) {
-    const r = runNapcatInstaller(join(ROOT, 'tools', 'napcat'))
+    const napcatRoot = join(ROOT, 'tools', 'napcat')
+    const r = runNapcatInstaller(napcatRoot)
     napcatDir = await findNapcat()
     if (r.status !== 0) {
-      step('安装 NapCat', 'FAIL', String(r.stderr ?? '').slice(0, 120))
+      const why = r.status === null ? '超时（8 分钟没结束，多半卡在权限或下载）' : String(r.stderr ?? '').slice(0, 120) || `退出码 ${r.status}`
+      step('安装 NapCat', 'FAIL', why)
+      printNapcatInstallerHelp(napcatRoot)
     } else if (napcatDir === '') {
       // 安装器退出码 0 不等于装对了地方：它可能被改到别的目录。
-      step('安装 NapCat', 'FAIL', `装完了，但 ${join(ROOT, 'tools', 'napcat')} 下还是找不到 NapCat`)
-      console.log('        安装器可能装到了别的路径。把它装回 tools/napcat/，或把产物手动解压到这里：')
-      console.log(`        ${join(ROOT, 'tools', 'napcat')}`)
+      step('安装 NapCat', 'FAIL', `装完了，但 ${napcatRoot} 下还是找不到 NapCat`)
+      printNapcatInstallerHelp(napcatRoot)
     } else {
       step('安装 NapCat', 'OK', `已部署到 ${relative(ROOT, napcatDir)}`)
     }
@@ -689,12 +808,12 @@ if (true) {
         },
       },
     }
-    blocks.push('\n' + YAML.stringify([entry]))
+    blocks.push('\n' + (await ensureYaml()).stringify([entry]))
   }
   if (!cordis.includes('id: mcp-browser')) {
     const nodeExe = process.execPath.replaceAll('\\', '/')
     const mcpCli = (process.env.PLAYWRIGHT_MCP_CLI ?? join(dirname(nodeExe), 'node_modules', '@playwright', 'mcp', 'cli.js')).replaceAll('\\', '/')
-    blocks.push('\n' + YAML.stringify([{
+    blocks.push('\n' + (await ensureYaml()).stringify([{
       insert: [{
         id: 'mcp-browser',
         name: '@deepseek-ai/dsh-mcp-client',

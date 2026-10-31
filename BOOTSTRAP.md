@@ -56,14 +56,21 @@ Test-Path "$env:USERPROFILE\.dsh\profiles\desktop"   # 有才算登录过
 ## 三、跑安装
 
 ```powershell
-# --qq 填「主人号」（白名单），不是机器人号
+npm install                                                   # 第一次必须：setup 要用 yaml
 node tools/setup.mjs --qq <主人号> --group <群号或省略> --install-napcat
 ```
+
+> `npm install` 漏了也不会死——setup 检测到缺 yaml 会自己装一次。
+> 但网络差时先跑一遍能省掉一轮等待。
 
 > ⚠️ `--qq` 只写进 `allowUsers`（谁能命令机器人）。**它和 NapCat 扫码登录的号无关**——
 > NapCat 登录的是你自己扫码的那个小号，脚本不碰。
 
 - `--install-napcat` 会下 300MB 的 QQ，可能跑 5–10 分钟，**不要中途打断**
+- **安装器卡住不弹窗？** 多半缺管理员权限。右键 `tools/napcat/NapCatInstaller.exe`
+  → 以管理员身份运行，装完再跑一次 setup
+- **只想补 Shell 层（35MB）？** 下 `NapCat.Shell.zip` 解压进 `tools/napcat/<Shell 目录>/`，
+  保留里面的 `QQ.exe`；setup 会自己验五个关键文件
 - 加 `--skip-mcp` 可以跳过 Playwright（浏览器能力，非必需）
 - 不确定会做什么时先用 `--dry-run` 看一遍
 
