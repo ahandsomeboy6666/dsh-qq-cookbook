@@ -368,7 +368,7 @@ async function githubAssetDigest(repo, assetName) {
 function psQuote(value) { return "'" + String(value).replace(/'/g, "''") + "'" }
 /** 写临时 .ps1 并以 -File 执行；路径/URL 作为变量传入，不做命令字符串拼接。 */
 function psRun(body, vars = {}, timeout = 180000) {
-  const assign = Object.entries(vars).map(([k, v]) => `${k} = ${psQuote(v)}`).join('\n')
+  const assign = Object.entries(vars).map(([k, v]) => `$${k} = ${psQuote(v)}`).join('\n')
   const file = join(tmpdir(), `dsh-ps-${randomUUID()}.ps1`)
   writeFileSync(file, '\uFEFF' + "$ProgressPreference='SilentlyContinue'\n[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n" + assign + '\n' + body, 'utf8')
   try {
