@@ -1149,3 +1149,11 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `cli check` → **12/12**
 
 **结论：PR2 完成。**
+
+### 2026-10-31 PR3 部署状态管理
+
+- [x] `checks/check-deploy-state.mjs`：DRY 保护（package/cordis/settings/vendor）、dry-run 前后仓库快照一致、重复 dry-run 输出稳定
+- [x] setup.mjs 每步 `step(name, status, detail)`，状态明确（OK/SKIP/TODO/FAIL）
+- [x] `cli check` → **13/13**
+
+**结论：PR3 完成（步骤状态 + dry-run 无副作用 + 重复稳定）。**

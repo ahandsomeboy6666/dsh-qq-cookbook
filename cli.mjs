@@ -42,6 +42,7 @@ const SCRIPTS = {
   bridgeConcurrency: 'checks/check-bridge-concurrency.mjs',
   cmdSafety: 'checks/check-cmd-safety.mjs',
   secBehavior: 'checks/security-behavior.mjs',
+  deployState: 'checks/check-deploy-state.mjs',
   audit: 'checks/check-audit.mjs',
   logging: 'checks/check-logging.mjs',
   drill: 'checks/attack-drill.mjs',
@@ -56,7 +57,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'deployState', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -87,6 +88,7 @@ const LABELS = {
   bridgeConcurrency: '桥接并发/去重',
   cmdSafety: '命令构造安全',
   secBehavior: '安全行为（静态）',
+  deployState: '部署状态',
   audit: '出站审计',
   logging: '日志无密钥',
   drill: '攻击演练（静态）'
