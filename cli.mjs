@@ -36,6 +36,7 @@ const SCRIPTS = {
   assets: 'checks/check-assets.mjs',
   consistency: 'checks/check-consistency.mjs',
   privacy: 'checks/check-privacy.mjs',
+  configRobust: 'checks/check-config-robust.mjs',
   audit: 'checks/check-audit.mjs',
   logging: 'checks/check-logging.mjs',
   drill: 'checks/attack-drill.mjs',
@@ -50,7 +51,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -75,6 +76,7 @@ const LABELS = {
   budget: '零花钱授权',
   browser: '浏览器能力',
   privacy: '无个人配置泄漏',
+  configRobust: '配置健壮性',
   audit: '出站审计',
   logging: '日志无密钥',
   drill: '攻击演练（静态）'

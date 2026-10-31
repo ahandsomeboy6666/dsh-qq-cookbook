@@ -6,6 +6,8 @@
  * 用法：node checks/check-patches.mjs [--json]
  */
 import { readFile, stat } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
@@ -73,6 +75,14 @@ const configChecks = [
   { name: '昵称含「肥鱼」', ok: nicknames },
   { name: 'napcat.dir 指向存在的目录', ok: napcatExists, detail: napcatDir || '(未配置)' },
 ]
+
+// 插件版本与基线比对（defaults.json 的 pluginBaseline）
+let baseline = ''
+try { baseline = JSON.parse(readFileSync(join(ROOT, 'config/defaults.json'), 'utf8')).pluginBaseline ?? '' } catch { /* 无 defaults */ }
+let head = ''
+try { head = execFileSync('git', ['-C', join(ROOT, 'vendor', 'dsh-im-bridge'), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() } catch { /* 非 git 目录 */ }
+const versionOk = Boolean(baseline) && Boolean(head) && head.startsWith(baseline)
+configChecks.push({ name: '插件版本与基线一致', ok: versionOk, detail: `${head.slice(0, 7)} / ${baseline.slice(0, 7)}` })
 
 const all = [...patchResults, ...configChecks]
 const ok = all.every((r) => r.ok)

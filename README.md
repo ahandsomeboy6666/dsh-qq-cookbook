@@ -97,6 +97,8 @@ node cli.mjs status
 
 前置条件、失败排查、每步期望输出见 [验收矩阵](docs/04-acceptance.md)。任务卡见 [tasks/README.md](tasks/README.md)。
 
+> 部署后冒烟（会真实发一条消息）：`node checks/smoke.mjs --url http://127.0.0.1:<桌面端端口> [--voice]`。
+>
 > CI：`.github/workflows/check.yml` 在 push/PR 时跑 `node cli.mjs check`。本地有 `.githooks/pre-push`（推送前跑同一套门禁，失败拒绝推送）；启用方式：`git config core.hooksPath .githooks`。仓库分支保护建议开启「Require status checks」。
 
 ## 目录
@@ -149,7 +151,7 @@ QQ 群消息是**不可信输入**。默认遵循 fail-closed：
 | 当前方案（一页纸） | ✅ 已拍板 |
 | 安全与零花钱授权模型 | ✅ 已定 |
 | 部署任务卡 D0–D3 | ✅ 已写 |
-| 检查脚本（14 个） | ✅ 可运行 |
+| 检查脚本（16 个） | ✅ 可运行 |
 | 环境（NapCat / cheems / 人设） | ✅ 已就绪（2026-10-27） |
 | 本地补丁（群聊唤醒层等） | ✅ 已生效，见 [补丁清单](docs/12-bridge-patches.md) |
 | 浏览器能力（Playwright MCP） | ✅ 已生效，见 [浏览器能力](docs/13-browser-mcp.md) |

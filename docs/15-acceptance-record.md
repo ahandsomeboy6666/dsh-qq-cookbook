@@ -1096,3 +1096,16 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [ ] 远程 branch protection（需在 GitHub 设置，见下）
 
 **结论：门禁三层（本地 hook + CI + 可选 branch protection）。**
+
+### 2026-10-31 测试行为补强（冒烟 + 配置 + 补丁版本）
+
+- [x] `checks/smoke.mjs`：OneBot 可达 / DSH 接口 / 配置解析 / 发送链路（真实发一条冒烟消息）/ `--voice` 语音
+  - 实测：5/5 通过（发送链路日志出现记录）
+- [x] `checks/check-config-robust.mjs`：模板 JSON 有效、个人配置可解析、模板状态合法、init 幂等逻辑存在
+  - 实测：4/4 通过
+- [x] `check-patches.mjs` 加「插件版本与基线一致」（vendor HEAD vs config/defaults.json 的 pluginBaseline）
+  - 实测：OK 03afb9c / 03afb9c
+- [x] `cli check` → **7/7**（新增配置健壮性）
+- [x] 冒烟不进门禁（会发消息），手动跑：`node checks/smoke.mjs --url <DSH端口> [--voice]`
+
+**结论：部署后冒烟、配置边界、补丁版本三类测试已就位。**
