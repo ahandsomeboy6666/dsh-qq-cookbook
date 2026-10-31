@@ -41,6 +41,12 @@ try {
   cpSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
   // 真实上游 clone（不依赖本机 vendor）
   if (existsSync(join(ROOT, 'tools', '一键启动肥鱼.bat'))) cpSync(join(ROOT, 'tools', '一键启动肥鱼.bat'), join(tmp, 'tools', '一键启动肥鱼.bat'));
+  // 假 DSH 桌面端（只做安装检测）：DSH_DESKTOP_DIR 设了之后就只认它
+  const fakeDsh = join(tmp, 'fake-dsh');
+  mkdirSync(join(fakeDsh, 'resources'), { recursive: true });
+  writeFileSync(join(fakeDsh, 'DeepSeek Harness.exe'), '', 'utf8');
+  writeFileSync(join(fakeDsh, 'resources', 'app-update.yml'), 'version: 0.0.0\n', 'utf8');
+
   // 隔离 DSH_HOME + 空 desktop profile
   const dshHome = join(tmp, 'dsh-home');
   mkdirSync(join(dshHome, 'profiles', 'desktop'), { recursive: true });
@@ -64,21 +70,34 @@ try {
     cwd: tmp,
     encoding: 'utf8',
     timeout: 600000,
-    env: { ...process.env, DSH_HOME: dshHome },
+    env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_DIR: fakeDsh },
   });
   const out = String(r.stdout ?? '') + String(r.stderr ?? '');
   const lines = out.split(/\r?\n/).filter((l) => /\[\w+\]/.test(l));
 
-  const has = (re) => re.test(out);
-  if (!has(/\[OK\]\s+clone 插件/)) fails.push('clone 插件 未成功：\n' + lines.filter(l => /clone|FAIL/.test(l)).join('\n'));
-  else pass.push('clone 插件 OK');
+  // 解析每个 step 的状态
+  const stepRe = /\[(OK|SKIP|TODO|FAIL)\]\s+([^\s].*?)(?:\s{2,}|$)/;
+  const steps = lines.map((l) => { const m = l.match(stepRe); return m ? { status: m[1], name: m[2].trim() } : null; }).filter(Boolean);
+  const statusOf = (name) => (steps.find((s) => s.name === name) ?? {}).status ?? '';
+  const failNames = steps.filter((s) => s.status === 'FAIL').map((s) => s.name);
 
-  if (has(/\[OK\]\s+应用本地补丁/)) pass.push('应用本地补丁 OK');
-  else if (has(/\[SKIP\]\s+应用本地补丁/)) fails.push('应用本地补丁 被跳过（应在干净 vendor 上应用）');
-  else fails.push('应用本地补丁 未成功：\n' + lines.filter(l => /补丁|FAIL/.test(l)).join('\n'));
+  // 必需步骤：缺失或非 OK 都算失败
+  const REQUIRED = ['clone 插件', '应用本地补丁', '注册到 desktop profile'];
+  for (const name of REQUIRED) {
+    const st = statusOf(name);
+    if (st === 'OK') pass.push(name + ' OK');
+    else fails.push(name + ' 状态=' + (st || '缺失'));
+  }
 
-  if (has(/\[OK\]\s+注册到 desktop profile/)) pass.push('注册到 profile OK');
-  else fails.push('注册到 profile 未成功：\n' + lines.filter(l => /注册|FAIL/.test(l)).join('\n'));
+  // 可选步骤：环境相关，允许失败，但必须出现在白名单里
+  const OPTIONAL_ALLOW_FAIL = new Set([
+    'NapCat 本体', 'NapCat 自带 QQ', '补全 NapCat', '下载 NapCat 安装包', '安装 NapCat',
+    '写入人设', '语音（edge-tts）', '语音配置', '开启语音', 'NapCat 启动器',
+    '安装 Playwright MCP', '写 cordis.patch.yml',
+  ]);
+  const unexpected = failNames.filter((n) => !OPTIONAL_ALLOW_FAIL.has(n) && !REQUIRED.includes(n));
+  if (unexpected.length) fails.push('出现了白名单外的失败步骤：' + unexpected.join('、'));
+  else pass.push('失败步骤均在可选白名单内（' + (failNames.join('、') || '无') + '）');
 
   // 安装产物必须含出站审计（patch 真的生效）
   const installedIndex = join(tmp, 'vendor', 'dsh-im-bridge', 'index.js');

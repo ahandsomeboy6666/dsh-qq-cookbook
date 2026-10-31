@@ -1166,3 +1166,12 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `cli check` → **15/15**
 
 **结论：安装链路（clone → checkout → patch → 注册）可验证。**
+
+### 2026-10-31 陌生人路径（无 DSH / 真从零）
+
+- [x] 从零安装：假 DSH 注入（DSH_DESKTOP_DIR）+ 真实上游 clone（gh-proxy 镜像）+ 产物断言（scanOutgoing/auditedAt）
+- [x] 可选步骤白名单：必需（clone/patch/注册）必须 OK；失败步骤只允许在白名单内
+- [x] 无 DSH 场景：明确 FAIL + 安装指引 + 阻断后续（不继续 clone）
+- [x] `cli check` → **16/16**
+
+**结论：陌生人路径（无 DSH → 装 DSH → 重跑）可验证。**

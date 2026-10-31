@@ -44,6 +44,7 @@ const SCRIPTS = {
   secBehavior: 'checks/security-behavior.mjs',
   outboundPaths: 'checks/check-outbound-paths.mjs',
   cleanInstall: 'checks/check-clean-install.mjs',
+  noDsh: 'checks/check-no-dsh.mjs',
   deployState: 'checks/check-deploy-state.mjs',
   audit: 'checks/check-audit.mjs',
   logging: 'checks/check-logging.mjs',
@@ -59,7 +60,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'cleanInstall', 'deployState', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'cleanInstall', 'noDsh', 'deployState', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -92,6 +93,7 @@ const LABELS = {
   secBehavior: '安全行为（静态）',
   outboundPaths: '出站路径覆盖',
   cleanInstall: '从零安装（隔离）',
+  noDsh: '无 DSH 指引',
   deployState: '部署状态',
   audit: '出站审计',
   logging: '日志无密钥',
