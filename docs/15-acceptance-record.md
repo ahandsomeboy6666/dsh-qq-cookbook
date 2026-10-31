@@ -1140,3 +1140,12 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `cli check` → **11/11**
 
 **结论：PR1 完成。**
+
+### 2026-10-31 PR2 安全行为测试
+
+- [x] `checks/security-behavior.mjs`：静态（4 项）+ 行为（--live）
+- [x] 行为实测：B1 非白名单目标被拒绝（HTTP 500）、B2 含路径消息被出站审计拦截、B3 单实例锁存在且 pid 存活
+- [x] 静态/行为分开报告
+- [x] `cli check` → **12/12**
+
+**结论：PR2 完成。**
