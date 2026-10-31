@@ -1,0 +1,9 @@
+#!/bin/sh
+# 推送前跑静态门禁：不通过就拒绝推送
+echo "[pre-push] 运行 node cli.mjs check ..."
+node cli.mjs check
+if [ $? -ne 0 ]; then
+  echo "[pre-push] 门禁未通过，拒绝推送。"
+  exit 1
+fi
+echo "[pre-push] 门禁通过。"

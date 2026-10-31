@@ -3,11 +3,15 @@
  * 攻击演练（静态版）：断言威胁模型 T1/T2/T3/T9 的防护点都在代码里。
  * 端到端演练需要 DSH 运行，这里只验证「防护机制存在且接线」。
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = import.meta.dirname.replace(/[\\/]checks$/, '');
 const INDEX = join(ROOT, 'vendor/dsh-im-bridge/index.js');
+if (!existsSync(INDEX)) {
+  console.log('[SKIP] vendor/dsh-im-bridge 未 clone（CI 环境），跳过攻击演练');
+  process.exit(0);
+}
 const src = readFileSync(INDEX, 'utf8');
 const fails = [];
 
