@@ -126,3 +126,18 @@ female-chengshu  成熟女性
 | `bass` | +5 @200Hz | 低频厚度（对齐初始样本） |
 
 改动位置：`E:\workspace\audio.cpp\gateway.mjs` 的 `FILTER` 和 `options`。
+
+## DSH 重启后 TTS 会挂（必读）
+
+`audiocpp_server.exe`（8080）和 `gateway.mjs`（8090）是 **DSH 的子进程**——DSH 重启时它们会被一起终止，但 NapCat（独立进程）活下来。
+
+**表现**：QQ 里发语音 → 没声音 / 报「语音失败」。
+
+**修复**：重启 DSH 后跑一次：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File E:\workspace\dsh-qq-cookbook\tools\start-feiyu.ps1
+```
+
+它会检测端口，只补启缺的服务（已启动的跳过）。
+```
