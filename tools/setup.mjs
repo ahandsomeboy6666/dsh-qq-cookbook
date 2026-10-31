@@ -223,10 +223,21 @@ async function repairNapcatShell(napcatDir) {
     console.log(`        补包失败，换下一个源…（${candidate.replace(/^https:\/\//, '').slice(0, 46)}）`)
   }
   if (!ok) throw new Error(`下载 Shell 包失败：${lastError}`)
+  const digest = await githubAssetDigest(defaults.napcatRepo, 'NapCat.Shell.zip')
+  if (digest.ok) {
+    const actual = sha256FileSync(zip)
+    if (actual !== digest.sha256) throw new Error(`NapCat 包 sha256 不符：期望 ${digest.sha256.slice(0, 16)}…，实际 ${actual.slice(0, 16)}…`)
+    console.log('        NapCat 包 sha256 校验通过')
+  } else {
+    console.log(`        ⚠ 无法获取 GitHub digest（${digest.reason}），降级为结构校验`)
+  }
   const bytes = statSync(zip).size
   const unzip = run('powershell.exe', ['-NoProfile', '-Command',
     `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${napcatDir}' -Force`])
   if (unzip.status !== 0) throw new Error('解压失败：' + String(unzip.stderr ?? '').slice(0, 140))
+  for (const name of ['package.json', 'napcat.mjs', 'napcat.quick.bat']) {
+    if (!existsSync(join(napcatDir, name))) throw new Error('NapCat 包结构不完整：缺少 ' + name)
+  }
   return bytes
 }
 
@@ -289,7 +300,16 @@ async function downloadDshInstaller() {
   const dir = join(ROOT, 'tools', 'downloads')
   await mkdir(dir, { recursive: true })
   const dest = join(dir, name)
-  if (await exists(dest)) return { dest, version, cached: true, verified: Boolean(sha) }
+  if (await exists(dest)) {
+    const cachedSha = await sha512File(dest)
+    const cachedOk = Boolean(sha) && cachedSha === sha
+    if (sha && !cachedOk) {
+      console.log('        缓存安装包哈希与清单不符，重新下载…')
+      rmSync(dest, { force: true })
+    } else {
+      return { dest, version, cached: true, verified: cachedOk }
+    }
+  }
   const file = await fetch(url)
   if (!file.ok || !file.body) throw new Error('下载失败 HTTP ' + file.status)
   const fh = await open(dest, 'w')
@@ -299,6 +319,42 @@ async function downloadDshInstaller() {
   await fh.close()
   const actual = hash.digest('base64')
   return { dest, version, bytes, verified: Boolean(sha) && actual === sha, shaMismatch: Boolean(sha) && actual !== sha }
+}
+
+/** 流式计算文件 SHA512（base64），用于缓存重验。 */
+async function sha512File(file) {
+  const hash = createHash('sha512')
+  const fh = await open(file, 'r')
+  const buf = Buffer.alloc(1024 * 1024)
+  try {
+    for (;;) {
+      const { bytesRead } = await fh.read(buf, 0, buf.length, null)
+      if (!bytesRead) break
+      hash.update(buf.subarray(0, bytesRead))
+    }
+  } finally { await fh.close() }
+  return hash.digest('base64')
+}
+/** 同步计算文件 SHA256（hex），用于 NapCat 包校验。 */
+function sha256FileSync(file) { return createHash('sha256').update(readFileSync(file)).digest('hex') }
+/** 通过 GitHub API 取 release asset 的 digest（sha256）。无 token 可能 403，调用方降级。 */
+async function githubAssetDigest(repo, assetName) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: {
+        'User-Agent': 'dsh-qq-cookbook',
+        Accept: 'application/vnd.github+json',
+        ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}),
+      },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` }
+    const json = await res.json()
+    const asset = (json.assets || []).find(a => a.name === assetName)
+    if (!asset) return { ok: false, reason: 'asset 不存在' }
+    const m = String(asset.digest || '').match(/^sha256:([a-f0-9]{64})$/i)
+    return m ? { ok: true, sha256: m[1].toLowerCase(), size: asset.size } : { ok: false, reason: 'asset 无 digest' }
+  } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 120) } }
 }
 
 function run(cmd, argv, cwd) {
@@ -386,11 +442,27 @@ if (!(await exists(VENDOR))) {
       console.log('        可以指定镜像：--mirror https://ghproxy.net/   或设 GITHUB_MIRROR')
       summary(); process.exit(1)
     }
-    run('git', ['checkout', '--quiet', defaults.pluginBaseline], VENDOR)
+    const checkout = run('git', ['checkout', '--quiet', defaults.pluginBaseline], VENDOR)
+    if (checkout.status !== 0) throw new Error('checkout 插件版本失败：' + String(checkout.stderr ?? '').slice(0, 120))
+    const head = run('git', ['rev-parse', 'HEAD'], VENDOR)
+    const expected = run('git', ['rev-parse', defaults.pluginBaseline], VENDOR)
+    if (head.status !== 0 || !head.stdout.trim()) throw new Error('读不到插件 HEAD')
+    if (expected.status === 0 && head.stdout.trim() !== expected.stdout.trim()) throw new Error(`插件版本不符：HEAD ${head.stdout.trim()} ≠ ${expected.stdout.trim()}`)
+    const dirty = run('git', ['status', '--porcelain'], VENDOR)
+    if (dirty.status === 0 && dirty.stdout.trim() !== '') throw new Error('插件工作区不干净（有未提交改动），拒绝继续')
     step('clone 插件', 'OK', usedMirror === defaults.pluginRepo ? defaults.pluginBaseline : `${defaults.pluginBaseline}（走镜像）`)
   }
 } else {
-  step('clone 插件', 'SKIP', '已存在')
+  const head = run('git', ['rev-parse', 'HEAD'], VENDOR)
+  const expected = run('git', ['rev-parse', defaults.pluginBaseline], VENDOR)
+  const same = head.status === 0 && expected.status === 0 && head.stdout.trim() === expected.stdout.trim()
+  if (same) {
+    step('clone 插件', 'SKIP', `已存在（${defaults.pluginBaseline}）`)
+  } else if (DRY) {
+    step('clone 插件', 'TODO', `已存在但版本不符（${head.stdout.trim().slice(0, 7)} ≠ ${defaults.pluginBaseline}）`)
+  } else {
+    step('clone 插件', 'FAIL', `已存在但版本不符（${head.stdout.trim().slice(0, 7)}），删掉 ${relative(ROOT, VENDOR)} 再重跑`)
+  }
 }
 
 const indexFile = join(VENDOR, 'index.js')

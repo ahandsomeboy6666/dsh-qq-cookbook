@@ -4,7 +4,7 @@
   "wsUrl": "ws://127.0.0.1:6701",
   "httpUrl": "http://127.0.0.1:6700",
   "pluginRepo": "https://github.com/cheems135/dsh-qq-bridge.git",
-  "pluginBaseline": "03afb9c",
+  "pluginBaseline": "03afb9cb7f582bec44ff5b8a233311b4c5e91249",
   "napcatRepo": "NapNeko/NapCatQQ",
   "personae": {
     "private": { "id": "feiyu", "name": "肥鱼·私聊", "file": "roles/肥鱼-私聊.md" },

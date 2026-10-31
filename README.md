@@ -46,6 +46,8 @@ node tools/setup.mjs      # 会问你 QQ 号 / 群号
 
 自动完成：检测 DSH（缺则下载安装包）→ NapCat（缺则下 OneKey，`--install-napcat` 可自动装）→ clone 插件并打补丁 → 注册到 profile → 写 `cordis.patch.yml` → 写两套人设并**绑定会话** → 装 Playwright MCP → 装语音依赖。
 
+> 插件固定到 commit `03afb9cb7f582bec44ff5b8a233311b4c5e91249`（v1.19）。安装器会校验 HEAD 与工作区干净；NapCat 包下载后按 GitHub API 的 `digest`（sha256）校验，无 digest 时降级为结构校验。
+
 之后只剩人工：**装 DSH 并登录、NapCat 扫码、小号只充 30 元**。
 
 细节与陌生人实测见 [一个命令恢复](docs/16-one-command.md)。
