@@ -28,7 +28,7 @@ index 587a624..8a6c6e6 100644
  export function describeSharedCard(card) {
    const label=card.kind==='music'?'音乐':card.kind==='video'?'视频':'链接';
 diff --git a/index.js b/index.js
-index 83d8357..5d766d0 100644
+index 83d8357..75ac99f 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -64,7 +64,31 @@ index 83d8357..5d766d0 100644
      cwd: str(config.cwd, process.cwd()),
      agentPreset: str(config.agentPreset, ''),
      model: normalizeModel(config.model),
-@@ -846,7 +865,21 @@ export function apply(ctx, rawConfig) {
+@@ -719,6 +738,23 @@ const CONSOLE_HTML = `<!doctype html>
+ 
+ export function apply(ctx, rawConfig) {
+   const cfg = normalizeConfig(rawConfig);
++  // T9 单实例锁：同一数据目录只允许一个桥接实例
++  {
++    const lockFile = join(cfg.dataDir, '.bridge.lock');
++    let locked = false;
++    try { writeFileSync(lockFile, String(process.pid), { flag: 'wx' }); locked = true; } catch {}
++    if (!locked) {
++      let pid = 0;
++      try { pid = Number(String(readFileSync(lockFile, 'utf8')).trim()); } catch {}
++      if (pid && pid !== process.pid) {
++        let alive = false;
++        try { process.kill(pid, 0); alive = true; } catch (e) { if (e.code === 'EPERM') alive = true; }
++        if (alive) throw new Error('另一个桥接实例正在运行（pid ' + pid + '），请先停止它');
++      }
++      writeFileSync(lockFile, String(process.pid));
++    }
++    ctx.on('dispose', () => { try { if (String(readFileSync(lockFile, 'utf8')).trim() === String(process.pid)) writeFileSync(lockFile, ''); } catch {} });
++  }
+   const configuredLoginWsUrl = cfg.wsUrl;
+   // Keep chat sessions outside the development repository and the credential directory.
+   // Hindsight's scoped path exclusion is installed for this root, leaving coding memory enabled.
+@@ -846,7 +882,21 @@ export function apply(ctx, rawConfig) {
      if(installed)for(const dispose of installed.cleanups)dispose?.();
      const scope=agent.ctx,cleanups=[];let persona=false;
      const tools=scope?.get?.('tools'),systemPrompt=scope?.get?.('systemPrompt');
@@ -87,7 +111,7 @@ index 83d8357..5d766d0 100644
      else if(chat.isOwner)throw Error('DSH 会话工具权限接口不可用');
      if(typeof systemPrompt?.section==='function'&&sessionInstructions.has(sessionId)){
        cleanups.push(systemPrompt.section({name:'deployment:persona-prefix',order:systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),text:instructions,interpolate:false}));
-@@ -867,6 +900,12 @@ export function apply(ctx, rawConfig) {
+@@ -867,6 +917,12 @@ export function apply(ctx, rawConfig) {
        log(`owner authorized tool approval for "${request.toolName}" in ${agent.id}`);
        return 'allowed-once';
      }
@@ -100,7 +124,55 @@ index 83d8357..5d766d0 100644
      log(`auto-rejected approval for "${request.toolName}" in ${agent.id}`);
      return 'rejected';
    });
-@@ -2415,7 +2454,18 @@ export function apply(ctx, rawConfig) {
+@@ -1032,7 +1088,7 @@ export function apply(ctx, rawConfig) {
+     const requestedEmotion=options.emotion||config.emotion||'auto';
+     const review=options.operationReview||await reviewOperation('voice',line,contextKey,{emotion:requestedEmotion,voiceDirection:operationText(options.instructions??config.breeze?.instructions??'',600)});
+     options={...options,emotion:requestedEmotion==='auto'?review.delivery.emotion:requestedEmotion,instructions:[options.instructions??config.breeze?.instructions,review.delivery.instructions].filter(Boolean).join('\n')};
+-    if(!['sweet','minimax','breeze'].includes(config.engine))return synthesizeLegacyVoice(line,chatKey,config);
++    if(!['sweet','minimax','breeze'].includes(config.engine))return synthesizeLegacyVoice(line,chatKey,config,options);
+     try{
+       mkdirSync(voiceDir,{recursive:true});const voiceOverride=options.voiceOverride||featureProfile(chatKey).voiceName;
+       if(config.engine==='breeze'){
+@@ -1987,13 +2043,18 @@ export function apply(ctx, rawConfig) {
+   }
+ 
+   /** Any HTTP TTS that returns audio bytes for `{text}` (e.g. GPT-SoVITS API). */
+-  async function synthesizeCustomVoice(text, voiceOverride = '', voiceSettings = settings.voice) {
++  async function synthesizeCustomVoice(text, voiceOverride = '', voiceSettings = settings.voice, direction = '', mood = '') {
+     const template = String(voiceSettings?.customUrl ?? '').trim();
+     if (template === '') throw new Error('没有配置自定义语音地址');
+-    const url = template
++    const baseUrl = template
+       .replace(/\{text\}/g, encodeURIComponent(text))
+       .replace(/\{voice\}/g, encodeURIComponent(String(voiceOverride || voiceSettings?.customVoice || '')));
+-    const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
++    const url = direction
++      ? baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'instruct=' + encodeURIComponent(direction)
++      : baseUrl;
++    const moodQs = mood ? (url.includes("&") || url.includes("?") ? "&" : "?") + "mood=" + encodeURIComponent(mood) : "";
++    const finalUrl = moodQs ? url + moodQs : url;
++    const response = await fetch(finalUrl, { signal: AbortSignal.timeout(60000) });
+     if (!response.ok) throw new Error(`自定义 TTS HTTP ${response.status}`);
+     const bytes = Buffer.from(await response.arrayBuffer());
+     if (bytes.length < 1000) throw new Error('自定义 TTS 返回内容太小');
+@@ -2003,14 +2064,14 @@ export function apply(ctx, rawConfig) {
+     return file;
+   }
+ 
+-  async function synthesizeLegacyVoice(text, chatKey = '', voiceSettings = settings.voice) {
++  async function synthesizeLegacyVoice(text, chatKey = '', voiceSettings = settings.voice, options = {}) {
+     try {
+       const line = String(text ?? '').trim();
+       if (line === '') return null;
+       mkdirSync(voiceDir, { recursive: true });
+       if (voiceSettings.engine === 'custom') {
+         try {
+-          const file = await synthesizeCustomVoice(line, featureProfile(chatKey).voiceName, voiceSettings);
++          const file = await synthesizeCustomVoice(line, featureProfile(chatKey).voiceName, voiceSettings, String(options.instructions ?? '').trim(), String(options.emotion ?? '').trim());
+           log(`voice (custom) synthesized (${statSync(file).size} bytes)`);
+           return file;
+         } catch (error) {
+@@ -2415,7 +2476,18 @@ export function apply(ctx, rawConfig) {
     */
    function burstSegments(burst, chat) {
      const segments = [];
@@ -120,7 +192,7 @@ index 83d8357..5d766d0 100644
      const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
      let cursor = 0;
      let match;
-@@ -3977,7 +4027,7 @@ export function apply(ctx, rawConfig) {
+@@ -3977,7 +4049,7 @@ export function apply(ctx, rawConfig) {
        candidates.push({ action: 'signature' });
      }
      if (candidates.length === 0) {
@@ -129,7 +201,7 @@ index 83d8357..5d766d0 100644
        saveState();
        return { action: 'none', reason: '没有触发条件' };
      }
-@@ -3998,6 +4048,7 @@ export function apply(ctx, rawConfig) {
+@@ -3998,6 +4070,7 @@ export function apply(ctx, rawConfig) {
        ...choices,
        '输出 JSON：{"action":"...","text":"...","target":"备注或尾号","reason":"一句为什么"}',
        '也可以输出 {"action":"none","reason":"没有值得打扰的新内容"}。内容具体但不凑话题，不反复催人回复。',
@@ -137,7 +209,7 @@ index 83d8357..5d766d0 100644
  
        `今天已经做过：${(auto.log ?? [])
          .slice(0, 5)
-@@ -4007,7 +4058,7 @@ export function apply(ctx, rawConfig) {
+@@ -4007,7 +4080,7 @@ export function apply(ctx, rawConfig) {
      ].join('\n');
      const contextKey=pick.target?'private:'+pick.target:panelOperationKey('');
      const plannedPersona=JSON.stringify(activePersona(contextKey)),plannedContext=operationContextStamp(operationContext(contextKey));
@@ -146,7 +218,7 @@ index 83d8357..5d766d0 100644
      if(stopped||accountPaused||generation!==(featureState.generation||0)||accountId!==(settings.activeAccountId||'')||JSON.stringify(autonomyConfig())!==JSON.stringify(config)||plannedPersona!==JSON.stringify(activePersona(contextKey))||plannedContext!==operationContextStamp(operationContext(contextKey)))return {skipped:'changed'};
      let decision = { action: 'none' };
      try {
-@@ -4017,10 +4068,20 @@ export function apply(ctx, rawConfig) {
+@@ -4017,10 +4090,20 @@ export function apply(ctx, rawConfig) {
        /* 解析失败就当不做 */
      }
      // The scheduler offers one eligible action; the character may decline it.
@@ -169,7 +241,7 @@ index 83d8357..5d766d0 100644
        saveState();
        return { action: 'none' };
      }
-@@ -4046,7 +4107,7 @@ export function apply(ctx, rawConfig) {
+@@ -4046,7 +4129,7 @@ export function apply(ctx, rawConfig) {
      }
      if (!switchedOn) return { action, rejected: '这个动作没开' };
      // 手动点「想一次」= 你本人要求的，跳过每日额度和最小间隔，只看开关。
@@ -178,7 +250,7 @@ index 83d8357..5d766d0 100644
      try {
        if (action === 'signature') await setSignature(text);
        else if (action === 'qzone') await publishQzone(text);
-@@ -4060,7 +4121,7 @@ export function apply(ctx, rawConfig) {
+@@ -4060,7 +4143,7 @@ export function apply(ctx, rawConfig) {
          await configureModel(sessionId,destination.key);
          installAgentContext(sessionId);pinApprovalPolicy(sessionId);
          const accepted=await nudge(chats.get(sessionId),(action==='share'?'你想主动分享的具体主题（不是对方说的话）：':'你正在考虑主动聊的话题（不是对方说的话）：')+JSON.stringify(text),action==='share'?'media-share':'autonomy',{manual});
@@ -187,7 +259,7 @@ index 83d8357..5d766d0 100644
        } else {
          return { action, rejected: 'unknown-action' };
        }
-@@ -4146,9 +4207,11 @@ export function apply(ctx, rawConfig) {
+@@ -4146,9 +4229,11 @@ export function apply(ctx, rawConfig) {
          if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)||auditById(chat.auditId)?.status==='superseded') return;
          let chunk = chunks[index];
          if (index > 0) {
@@ -202,7 +274,7 @@ index 83d8357..5d766d0 100644
            await new Promise((resolve) => setTimeout(resolve, pause));
          }
          if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)) return;
-@@ -4246,6 +4309,18 @@ export function apply(ctx, rawConfig) {
+@@ -4246,6 +4331,18 @@ export function apply(ctx, rawConfig) {
          // a successful render it degrades to plain text instead of vanishing.
          let voiceFile = null;
          let voiceShare=null;
@@ -221,7 +293,7 @@ index 83d8357..5d766d0 100644
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4287,6 +4362,15 @@ export function apply(ctx, rawConfig) {
+@@ -4287,6 +4384,15 @@ export function apply(ctx, rawConfig) {
            sendSegments(chat,groups[group]);
          }
        }
@@ -237,7 +309,7 @@ index 83d8357..5d766d0 100644
      }).catch((error) => log(`send failed: ${error?.message ?? error}`));
    }
    /* ---------------- NapCat 掉线自愈 ---------------- */
-@@ -4532,7 +4616,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4638,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -248,7 +320,7 @@ index 83d8357..5d766d0 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4735,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4757,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -257,7 +329,7 @@ index 83d8357..5d766d0 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4846,92 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4868,92 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -350,7 +422,7 @@ index 83d8357..5d766d0 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4967,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4989,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -359,7 +431,7 @@ index 83d8357..5d766d0 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +4989,104 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +5011,104 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -465,7 +537,7 @@ index 83d8357..5d766d0 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5017,6 +5285,11 @@ export function apply(ctx, rawConfig) {
+@@ -5017,6 +5307,11 @@ export function apply(ctx, rawConfig) {
        } else if (segment?.type === 'video') {if(!await addVideoContent(segment.data||{},content,notes,chatKey))uncertain=true;}
        else if (segment?.type === 'file') { notes.push('收到文件：' + String(segment.data?.name || segment.data?.file || '未命名').slice(0,200) + '；文件正文未读取。'); uncertain = true; }
      }
@@ -477,7 +549,7 @@ index 83d8357..5d766d0 100644
      if (shared.text) notes.push(shared.text);
      if (notes.length) content.unshift({ type: 'text', text: notes.join('\n\n') });
      content.uncertain = uncertain || shared.references.some(reference=>reference.mediaStatus==='failed'||['failed','partial'].includes(reference.status));
-@@ -5388,9 +5661,10 @@ export function apply(ctx, rawConfig) {
+@@ -5388,9 +5683,10 @@ export function apply(ctx, rawConfig) {
  
    /** Ask the model to say something on its own; `[skip]` means it stayed quiet. */
    async function nudge(chat, cue, kind,options={}) {
@@ -491,7 +563,7 @@ index 83d8357..5d766d0 100644
      if (typeof chat.sessionId !== 'string') return;
      const budget=autonomyState();budget.counts.chats++;budget.lastActionAt=Date.now();saveState();
      chat.proactivePending = true;
-@@ -5430,9 +5704,10 @@ export function apply(ctx, rawConfig) {
+@@ -5430,9 +5726,10 @@ export function apply(ctx, rawConfig) {
      const minutes = minMinutes + Math.random() * Math.max(1, maxMinutes - minMinutes);
      chat.silenceTimer = setTimeout(() => {
        chat.silenceTimer = null;
@@ -505,7 +577,40 @@ index 83d8357..5d766d0 100644
        void nudge(chat, cfg.silence.cue, 'silence').then(accepted=>{if(accepted)chat.nudges=(chat.nudges||0)+1;});
      }, Math.round(minutes * 60_000));
      log(`silence nudge armed in ~${Math.round(minutes)} min`);
-@@ -5775,7 +6050,12 @@ export function apply(ctx, rawConfig) {
+@@ -5715,6 +6012,20 @@ export function apply(ctx, rawConfig) {
+     else logMessage({ dir: 'out', chat: job.chat, text: text.slice(0,20000), localId: job.id, ...entry });
+     if(job.status==='sent')recordCalendarRow({...existing,time:job.at,dir:'out',chat:job.chat,text,localId:job.id,personaId:job.personaId||auditById(job.auditId)?.persona||activePersona(job.chat).id,...entry});
+   }
++  const OUTBOUND_RULES = [
++    { name: '本机路径', re: /(?:^|[^A-Za-z0-9])[A-Za-z]:\\[^\s"'<>]{2,}|(?:^|\s)\/(?:Users|home|etc|var)\//i },
++    { name: '凭据', re: /(?:api[_-]?key|access[_-]?token|secret(?:[_-]?key)?|password|passwd|密码|密钥|令牌)\s*[:=：]?\s*[A-Za-z0-9_\-]{12,}/i },
++    { name: '私钥', re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
++  ];
++  function scanOutgoing(segments) {
++    for (const seg of segments || []) {
++      if (seg?.type !== 'text') continue;
++      const text = String(seg?.data?.text || '');
++      for (const rule of OUTBOUND_RULES) if (rule.re.test(text)) return rule.name;
++    }
++    return '';
++  }
++
+   function queueOutgoing(chat, segments, previousId = '') {
+     if (!Array.isArray(segments) || !segments.length) return null;
+     const origin = auditById(chat.auditId);if(origin?.status==='superseded')return null;if(origin&&origin.accountId!==(settings.activeAccountId||''))return null;
+@@ -5748,7 +6059,11 @@ export function apply(ctx, rawConfig) {
+         guardState.lastSendAt = Date.now(); guardState.windowCount += 1;
+         try {
+           const wireSegments = outgoingImageSegments(job.segments);
++          const violation = scanOutgoing(wireSegments);
++          if (violation) { job.status = 'cancelled'; job.error = '出站审计拦截：' + violation; saveFeatures(); logDelivery(job); continue; }
++          job.auditedAt = Date.now();
+           const params = job.kind === 'group' ? { message_type: 'group', group_id: Number(job.chatId) || job.chatId, message: wireSegments } : { message_type: 'private', user_id: Number(job.chatId) || job.chatId, message: wireSegments };
++          if (!job.auditedAt) { job.status = 'cancelled'; job.error = '出站未审计（跳过 scanOutgoing）'; saveFeatures(); logDelivery(job); continue; }
+           const result = await request('send_msg', params, 15000);
+           if (job.status === 'cancelled') continue;
+           job.messageId = result?.message_id !== undefined ? String(result.message_id) : '';
+@@ -5775,7 +6090,12 @@ export function apply(ctx, rawConfig) {
      return payload.message_type === 'group' ? effectiveGroups().includes(group) && (!cfg.groupRequireAt || mentionsSelf(payload.message, payload.self_id)) : effectiveUsers().includes(user);
    }
    function handlePayload(payload) {
@@ -519,7 +624,7 @@ index 83d8357..5d766d0 100644
      const key = `${payload.message_type === 'group' ? 'group' : 'private'}:${payload.message_type === 'group' ? payload.group_id : payload.user_id}`;
      const id = payload.message_id !== undefined ? `${payload.self_id}:${key}:${payload.message_id}` : randomUUID();
      if (featureState.inbox.some(job => job.id === id)) return;
-@@ -5785,7 +6065,9 @@ export function apply(ctx, rawConfig) {
+@@ -5785,7 +6105,9 @@ export function apply(ctx, rawConfig) {
      const now=Date.now(),firstQueued=featureState.inbox.find(j=>j.key===key&&j.status==='queued');
      const ms=mergeable(payload)?debounceDelay(settings.companion.enabled?settings.companion.waitMode:'off',conversationStates()[key]?.lastSeen,firstQueued?.at||now,now,{mergedMs:settings.reliability.mergeMs,urgent:settings.reliability.mergeMs===0}):0;
      if (inboxTimers.has(key)) clearTimeout(inboxTimers.get(key));
@@ -530,7 +635,7 @@ index 83d8357..5d766d0 100644
    }
    async function drainInbox(key) {
      if (inboxRunning.has(key) || stopped || accountPaused) return;
-@@ -5909,7 +6191,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6231,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
@@ -559,3 +664,19 @@ index 7181d04..d10059d 100644
   if(!data||typeof data!=='object'||Array.isArray(data)||!operationText(data.intent,200))throw Error('情境判断没有给出当前意图，本次未调用外部功能');
   const delivery=data.delivery&&typeof data.delivery==='object'?data.delivery:{},allowed=['auto','natural','happy','gentle','sad','surprised','serious'];
   const selected=emotion!=='auto'&&allowed.includes(emotion)?emotion:allowed.includes(delivery.emotion)?delivery.emotion:'natural';
+diff --git a/voice-studio.js b/voice-studio.js
+index bbafda4..cd9299d 100644
+--- a/voice-studio.js
++++ b/voice-studio.js
+@@ -71,8 +71,9 @@ export async function miniMaxSpeech(line,config={},options={},fetchImpl=globalTh
+  const mini=voiceExtras(config).minimax;if(!mini.apiKey)throw Error('情绪增强需要单独填写 MiniMax API Key；免费甜妹无需 Key');
+  const override=String(options.voiceOverride||'');const voiceId=override&&!/^zh-/.test(override)?text(override,120):mini.voiceId;
+  const requested=options.emotion||config.emotion||'auto';const mood=voiceMood(requested,line);
+- const emotion={natural:'calm',happy:'happy',gentle:'calm',sad:'sad',surprised:'surprised',serious:'calm'}[mood];
+- const payload={model:mini.model,text:String(line).trim(),stream:false,output_format:'hex',language_boost:'Chinese',voice_setting:{voice_id:voiceId,speed:mini.speed,vol:1,pitch:0,...(requested==='auto'?{}:{emotion})},audio_setting:{sample_rate:32000,bitrate:128000,format:'mp3',channel:1}};
++ const EMOTION_TUNE={happy:{emotion:'happy',speed:1.05,pitch:2},sad:{emotion:'sad',speed:0.9,pitch:-2},angry:{emotion:'angry',speed:1.05,pitch:2},surprised:{emotion:'surprised',speed:1.05,pitch:3},gentle:{emotion:'calm',speed:0.92,pitch:-1},calm:{emotion:'calm',speed:0.95,pitch:-1},serious:{emotion:'calm',speed:0.95,pitch:-1},natural:{emotion:'calm',speed:1,pitch:0}};
++ const tune=EMOTION_TUNE[mood]||EMOTION_TUNE.natural;
++ const payload={model:mini.model,text:String(line).trim(),stream:false,output_format:'hex',language_boost:'Chinese',voice_setting:{voice_id:voiceId,speed:Number((mini.speed*tune.speed).toFixed(2)),vol:1,pitch:tune.pitch,...(requested==='auto'?{}:{emotion:tune.emotion})},audio_setting:{sample_rate:32000,bitrate:128000,format:'mp3',channel:1}};
+  if(!payload.text||payload.text.length>3000)throw Error('语音文本需为 1 到 3000 字');
+  let response;try{response=await fetchImpl('https://api.minimax.cn/v1/t2a_v2',{method:'POST',redirect:'error',headers:{authorization:'Bearer '+mini.apiKey,'content-type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(45000)});}catch{throw Error('情绪语音接口连接失败或超时');}
+  const raw=await response.text();if(raw.length>42*1024*1024)throw Error('情绪语音返回过大');

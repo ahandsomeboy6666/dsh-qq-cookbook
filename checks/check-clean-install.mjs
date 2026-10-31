@@ -5,7 +5,7 @@
  * 用法：node checks/check-clean-install.mjs [--skip]   （--skip 跳过真实 clone）
  * 说明：会真实 clone 一次插件（约 30MB，走镜像），约 1–3 分钟。
  */
-import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -20,7 +20,9 @@ if (process.argv.includes('--skip')) {
 }
 
 const ROOT = dirname(import.meta.dirname);
-const tmp = mkdtempSync(join(ROOT, '.tmp-clean-install-'));
+const tmpBase = 'E:/workspace/.tmp-clean-install';
+mkdirSync(tmpBase, { recursive: true });
+const tmp = mkdtempSync(join(tmpBase, 'run-'));
 const fails = [];
 const pass = [];
 
@@ -31,13 +33,13 @@ try {
     if (existsSync(join(ROOT, dir))) cpSync(join(ROOT, dir), join(tmp, dir), { recursive: true });
   }
   mkdirSync(join(tmp, 'tools'), { recursive: true });
+  // setup.mjs 依赖 yaml（根 node_modules）：用 junction 挂过去
+  if (existsSync(join(ROOT, 'node_modules'))) {
+    try { symlinkSync(join(ROOT, 'node_modules'), join(tmp, 'node_modules'), 'junction'); } catch { /* 已存在 */ }
+  }
+  if (existsSync(join(ROOT, 'package.json'))) cpSync(join(ROOT, 'package.json'), join(tmp, 'package.json'));
   cpSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
-  // 用本机已有 vendor 作为 clone 源（验证 clone/checkout/patch 逻辑，不依赖网络）
-  const localSrc = join(ROOT, 'vendor', 'dsh-im-bridge');
-  const defaultsPath = join(tmp, 'config', 'defaults.json');
-  const defaultsCfg = JSON.parse(readFileSync(defaultsPath, 'utf8'));
-  defaultsCfg.pluginRepo = localSrc.replaceAll('\\', '/');
-  writeFileSync(defaultsPath, JSON.stringify(defaultsCfg, null, 2) + '\n', 'utf8');
+  // 真实上游 clone（不依赖本机 vendor）
   if (existsSync(join(ROOT, 'tools', '一键启动肥鱼.bat'))) cpSync(join(ROOT, 'tools', '一键启动肥鱼.bat'), join(tmp, 'tools', '一键启动肥鱼.bat'));
   // 隔离 DSH_HOME + 空 desktop profile
   const dshHome = join(tmp, 'dsh-home');
@@ -57,6 +59,7 @@ try {
     '--qq', '000000000',
     '--skip-mcp',
     '--no-download',
+    '--mirror', process.env.CLEAN_INSTALL_MIRROR || 'https://gh-proxy.com/',
   ], {
     cwd: tmp,
     encoding: 'utf8',
@@ -64,6 +67,12 @@ try {
     env: { ...process.env, DSH_HOME: dshHome },
   });
   const out = String(r.stdout ?? '') + String(r.stderr ?? '');
+  if (r.status !== 0 || !out) {
+    console.log('[debug] spawn:', JSON.stringify({ status: r.status, signal: r.signal, error: r.error ? String(r.error.message) : null, stdoutLen: String(r.stdout ?? '').length, stderrLen: String(r.stderr ?? '').length }));
+    console.log('[debug] stdout:' + String(r.stdout ?? '').slice(0, 300));
+    console.log('[debug] stderr:' + String(r.stderr ?? '').slice(0, 500));
+    console.log('[debug] tmp kept at ' + tmp);
+  }
   const lines = out.split(/\r?\n/).filter((l) => /\[\w+\]/.test(l));
 
   const has = (re) => re.test(out);
@@ -76,6 +85,18 @@ try {
 
   if (has(/\[OK\]\s+注册到 desktop profile/)) pass.push('注册到 profile OK');
   else fails.push('注册到 profile 未成功：\n' + lines.filter(l => /注册|FAIL/.test(l)).join('\n'));
+
+  // 安装产物必须含出站审计（patch 真的生效）
+  const installedIndex = join(tmp, 'vendor', 'dsh-im-bridge', 'index.js');
+  if (existsSync(installedIndex)) {
+    const installedSrc = readFileSync(installedIndex, 'utf8');
+    if (installedSrc.includes('scanOutgoing')) pass.push('安装产物含 scanOutgoing');
+    else fails.push('安装产物缺少 scanOutgoing（patch 未包含审计改动）');
+    if (installedSrc.includes('auditedAt')) pass.push('安装产物含 auditedAt');
+    else fails.push('安装产物缺少 auditedAt');
+  } else {
+    fails.push('安装后找不到 vendor/dsh-im-bridge/index.js');
+  }
 
   // 版本校验：vendor HEAD 应等于固定 SHA
   const vendor = join(tmp, 'vendor', 'dsh-im-bridge');
