@@ -74,6 +74,24 @@ if (LIVE) {
       blocked ? behaviorPass.push('B2 含路径消息被出站审计拦截') : behaviorFail.push('B2 含路径消息未被拦截');
     } else behaviorFail.push('B2 找不到 owner（settings.json）');
 
+    // B4：正常消息必须仍能发出（证明审计不误杀；状态查 features 的 outbox）
+    if (owner) {
+      const r4 = await fetch(`${DSH_URL}/im-bridge/send`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: `private:${owner}`, text: '行为测试正常消息 ' + Date.now() }),
+        signal: AbortSignal.timeout(10000),
+      });
+      await r4.text();
+      await new Promise(r => setTimeout(r, 3000));
+      const st4 = await (await fetch(`${DSH_URL}/im-bridge/features`, { signal: AbortSignal.timeout(8000) })).text();
+      const jobs4 = (() => { try { return JSON.parse(st4).outbox || []; } catch { return []; } })();
+      const sent = jobs4.slice(-3).some(j => j.status === 'sent');
+      const blocked = jobs4.slice(-3).some(j => /出站审计拦截/.test(String(j.error || '')));
+      sent ? behaviorPass.push('B4 正常消息发出（审计未误杀）') : behaviorFail.push(`B4 正常消息没有 sent 状态（最近：${jobs4.slice(-3).map(j => j.status).join(',')}）`);
+      if (blocked) behaviorPass.push('B4 最近仍有审计拦截记录（证明拦截生效）');
+    }
+
     // B3：单实例锁
     const lock = join(homedir(), '.dsh/im-bridge/.bridge.lock');
     if (existsSync(lock)) {
