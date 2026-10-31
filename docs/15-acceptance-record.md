@@ -1075,3 +1075,13 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] git：工作区干净，已推送
 
 **结论：可验收。**
+
+### 2026-10-31 安装器完整性修复（setup.mjs）
+
+- [x] DSH 安装包缓存：命中时重算 SHA512，与清单不符则删除重下
+- [x] NapCat 包：按 GitHub API `digest`(sha256) 校验（实测 `02e5ff0f7991…`）；无 digest 降级结构校验；解压后断言 `package.json`/`napcat.mjs`/`napcat.quick.bat`
+- [x] 插件版本：固定 40 位 SHA `03afb9cb7f…`；checkout 后 `rev-parse HEAD` + `status --porcelain` 校验；已存在目录也验版本
+- [x] `node tools/setup.mjs --dry-run --qq 000000000` → 插件 SKIP（版本匹配）
+- [x] `node cli.mjs check` → 6/6
+
+**结论：三个 review 问题全部修复并验证。**
