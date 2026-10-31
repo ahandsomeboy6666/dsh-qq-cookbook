@@ -54,6 +54,11 @@ const before = snapshot(ROOT);
 const run = spawnSync(process.execPath, [SETUP, '--dry-run', '--qq', '000000000'], { encoding: 'utf8', timeout: 180000, cwd: ROOT });
 const out1 = String(run.stdout ?? '') + String(run.stderr ?? '');
 const after = snapshot(ROOT);
+// 没有 DSH 时 dry-run 会 FAIL（未安装）——这是环境前置条件，不是部署状态问题
+if (/\[FAIL\]\s+DSH 桌面端/.test(out1)) {
+  console.log('[SKIP] 未安装 DSH 桌面端，跳过部署状态检查');
+  process.exit(2);
+}
 if (run.status !== 0) fails.push('dry-run 退出码非 0：' + out1.slice(-200));
 if (before !== after) {
   const a = new Set(before.split('\n'));
