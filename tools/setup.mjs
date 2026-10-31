@@ -496,18 +496,33 @@ if (await exists(indexFile)) {
     const check = run('git', ['apply', '--check', PATCH], VENDOR)
     if (check.status !== 0) {
       step('应用本地补丁', 'FAIL', (check.stderr || '补丁与当前上游不兼容').trim().slice(0, 200))
-    } else {
-      run('git', ['apply', PATCH], VENDOR)
-      // 数量从补丁本身数，别写死——补丁一直在长（现在 22 处）。
-      let hunks = 0
-      let files = 0
-      try {
-        const text = await readFile(PATCH, 'utf8')
-        hunks = (text.match(/^@@/gm) ?? []).length
-        files = (text.match(/^diff --git /gm) ?? []).length
-      } catch { /* 读不到就只报状态 */ }
-      step('应用本地补丁', 'OK', `${files} 个文件 / ${hunks} 处改动`)
+      console.log('        补丁与上游版本不兼容：更新 patches/ 或回退 pluginBaseline')
+      summary(); process.exit(1)
     }
+    const applied = run('git', ['apply', PATCH], VENDOR)
+    if (applied.status !== 0) {
+      step('应用本地补丁', 'FAIL', 'git apply 执行失败：' + String(applied.stderr ?? '').slice(0, 160))
+      summary(); process.exit(1)
+    }
+    const patched = await readFile(indexFile, 'utf8')
+    if (!patched.includes('normalizeGroupWake')) {
+      step('应用本地补丁', 'FAIL', 'apply 成功但关键标记缺失（normalizeGroupWake）')
+      summary(); process.exit(1)
+    }
+    const dirtyAfter = run('git', ['status', '--porcelain'], VENDOR)
+    if (dirtyAfter.status === 0 && dirtyAfter.stdout.trim() === '') {
+      step('应用本地补丁', 'FAIL', 'apply 后工作区无改动（补丁未生效）')
+      summary(); process.exit(1)
+    }
+    // 数量从补丁本身数，别写死——补丁一直在长（现在 22 处）。
+    let hunks = 0
+    let files = 0
+    try {
+      const text = await readFile(PATCH, 'utf8')
+      hunks = (text.match(/^@@/gm) ?? []).length
+      files = (text.match(/^diff --git /gm) ?? []).length
+    } catch { /* 读不到就只报状态 */ }
+    step('应用本地补丁', 'OK', `${files} 个文件 / ${hunks} 处改动`)
   }
 } else {
   step('应用本地补丁', 'SKIP', '插件未就绪')

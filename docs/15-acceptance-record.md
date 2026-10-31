@@ -1157,3 +1157,12 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `cli check` → **13/13**
 
 **结论：PR3 完成（步骤状态 + dry-run 无副作用 + 重复稳定）。**
+
+### 2026-10-31 链路审查：补丁环节加固 + 从零安装
+
+- [x] setup.mjs 补丁环节：`git apply --check` 失败 → `exit 1`；`git apply` 返回码检查；apply 后断言 `normalizeGroupWake` + 工作区有改动
+- [x] `checks/check-clean-install.mjs`：临时目录 + 独立 DSH_HOME + 本地 vendor 作 clone 源
+- [x] 实测：clone / 应用本地补丁 / 注册到 profile 全 OK，vendor HEAD = pluginBaseline
+- [x] `cli check` → **15/15**
+
+**结论：安装链路（clone → checkout → patch → 注册）可验证。**
