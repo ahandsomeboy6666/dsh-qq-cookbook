@@ -28,3 +28,6 @@ vendor/dsh-im-bridge/
 
 # 个人配置（部署时从 config.example.json 生成，不进仓库）
 config.local.json
+
+# 从零安装测试的临时目录
+.tmp-clean-install-*/
