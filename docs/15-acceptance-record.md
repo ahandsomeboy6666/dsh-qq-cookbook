@@ -1085,3 +1085,14 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `node cli.mjs check` → 6/6
 
 **结论：三个 review 问题全部修复并验证。**
+
+### 2026-10-31 CI 门禁修复
+
+- [x] 原因：`vendor/dsh-im-bridge` 被 gitignore，CI 无该目录 → `check-audit`/`attack-drill` 崩溃 → CI 红
+- [x] 修法：vendor 缺失时 SKIP（本地绿、CI 绿）
+- [x] 本地门禁：`.githooks/pre-push` + `core.hooksPath`，push 前跑 `cli check`，失败拒绝推送
+- [x] 实测：push 触发 hook → 6/6 通过 → 推送成功
+- [x] CI：`static` job → **success**（run 41164867107）
+- [ ] 远程 branch protection（需在 GitHub 设置，见下）
+
+**结论：门禁三层（本地 hook + CI + 可选 branch protection）。**

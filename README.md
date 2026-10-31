@@ -97,7 +97,7 @@ node cli.mjs status
 
 前置条件、失败排查、每步期望输出见 [验收矩阵](docs/04-acceptance.md)。任务卡见 [tasks/README.md](tasks/README.md)。
 
-> CI 模板在 [docs/templates/ci-check.yml](docs/templates/ci-check.yml)：复制到 `.github/workflows/` 即可启用；push 时 token 需要 `workflow` 权限。
+> CI：`.github/workflows/check.yml` 在 push/PR 时跑 `node cli.mjs check`。本地有 `.githooks/pre-push`（推送前跑同一套门禁，失败拒绝推送）；启用方式：`git config core.hooksPath .githooks`。仓库分支保护建议开启「Require status checks」。
 
 ## 目录
 
