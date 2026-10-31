@@ -32,7 +32,7 @@ try { raw = await readFile(LOG, 'utf8') } catch { /* 没日志 */ }
 if (raw === null) {
   if (json) console.log(JSON.stringify({ skipped: true, reason: 'bridge.log 不存在' }, null, 2))
   else console.log('\n行为回归\n\n  SKIP  bridge.log 不存在（CI 或还没跑过）\n')
-  process.exit(0)
+  process.exit(2)
 }
 
 const entries = []

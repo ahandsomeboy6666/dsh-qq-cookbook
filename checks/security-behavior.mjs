@@ -30,7 +30,7 @@ const behaviorFail = [];
 // ---------- 静态 ----------
 if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor 不存在（CI），跳过安全行为测试');
-  process.exit(0);
+  process.exit(2);
 }
 const src = readFileSync(INDEX, 'utf8');
 const s = (name, ok, detail = '') => (ok ? staticPass : staticFail).push(name + (detail ? `（${detail}）` : ''));

@@ -13,8 +13,8 @@ const candidates = [
 ].filter((p) => existsSync(p));
 
 if (!candidates.length) {
-  console.log('[PASS] 没有 bridge.log，跳过（无日志可泄露）');
-  process.exit(0);
+  console.log('[SKIP] 没有 bridge.log（无日志可泄露）');
+  process.exit(2);
 }
 
 const SECRET = /(?:sk-[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|Bearer\s+[A-Za-z0-9._-]{20,}|[A-Za-z0-9_-]{20,}\.(?:api|key|token))/;

@@ -96,13 +96,16 @@ const LABELS = {
 
 function run(item) {
   const script = join(ROOT, SCRIPTS[item])
-  const extra = item === 'probeOnebot' || item === 'install' ? ['--require'] : []
-  const r = spawnSync(process.execPath, [script, ...extra], {
+  const r = spawnSync(process.execPath, [script], {
     cwd: ROOT,
     stdio: 'inherit',
     windowsHide: true
   })
-  return r.status === 0
+  if (r.error) return 'ERROR'
+  if (r.signal) return 'ERROR'
+  if (r.status === 0) return 'PASS'
+  if (r.status === 2) return 'SKIP'
+  return 'FAIL'
 }
 
 function runGroup(name) {
@@ -110,24 +113,32 @@ function runGroup(name) {
   console.log(`\n━━━ ${group.title}（${name}）━━━`)
   const results = []
   for (const item of group.items) {
-    const ok = run(item)
-    results.push({ item, ok })
+    const state = run(item)
+    results.push({ item, state })
   }
   return { group, results }
 }
 
 function summarize(sections) {
   const all = sections.flatMap((s) => s.results)
-  const passed = all.filter((r) => r.ok).length
-  const failed = all.length - passed
+  const count = (st) => all.filter((r) => r.state === st).length
+  const passed = count('PASS')
+  const skipped = count('SKIP')
+  const failed = count('FAIL')
+  const errored = count('ERROR')
   console.log('\n━━━ 汇总 ━━━')
   for (const s of sections) {
     for (const r of s.results) {
-      console.log(`  ${r.ok ? '[PASS]' : '[FAIL]'}  ${LABELS[r.item]}`)
+      const tag = { PASS: '[PASS]', FAIL: '[FAIL]', SKIP: '[SKIP]', ERROR: '[ERROR]' }[r.state] ?? '[??]'
+      console.log(`  ${tag}  ${LABELS[r.item]}`)
     }
   }
-  console.log(`\n  ${passed}/${all.length} 通过${failed ? `，${failed} 项未就绪` : ''}\n`)
-  return failed
+  const parts = [`${passed}/${all.length} 通过`]
+  if (skipped) parts.push(`${skipped} 跳过`)
+  if (failed) parts.push(`${failed} 失败`)
+  if (errored) parts.push(`${errored} 异常`)
+  console.log(`\n  ${parts.join('，')}\n`)
+  return failed + errored
 }
 
 const cmd = process.argv[2] ?? 'status'
@@ -161,6 +172,8 @@ if (cmd === 'check') {
 }
 
 const failed = summarize(sections)
-const allPassed = sections.flatMap((s) => s.results).every((r) => r.ok)
+const blocking = sections
+  .flatMap((s) => s.results)
+  .filter((r) => r.state === 'FAIL' || r.state === 'ERROR').length
 
-process.exit(allPassed ? 0 : 1)
+process.exit(blocking ? 1 : 0)

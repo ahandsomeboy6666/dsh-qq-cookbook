@@ -29,7 +29,7 @@ try { featuresCode = await readFile(VENDOR_FEATURES, 'utf8') } catch { /* 老版
 if (code === null) {
   if (json) console.log(JSON.stringify({ skipped: true, reason: 'vendor/dsh-im-bridge 不存在' }, null, 2))
   else console.log('\n补丁检查\n\n  SKIP  vendor/dsh-im-bridge 不存在（CI 或本机未装插件）\n')
-  process.exit(0)
+  process.exit(2)
 }
 
 const PATCHES = [

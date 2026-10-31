@@ -16,7 +16,7 @@ const pass = [];
 // 1. 静态：saveSettings 原子写
 if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor 不存在（CI），跳过配置恢复测试');
-  process.exit(0);
+  process.exit(2);
 }
 const src = readFileSync(INDEX, 'utf8');
 const saveSeg = (src.match(/function saveSettings\(\)[\s\S]{0,600}/) || [''])[0];

@@ -9,7 +9,7 @@ const ROOT = import.meta.dirname.replace(/[\\/]checks$/, '');
 const INDEX = join(ROOT, 'vendor/dsh-im-bridge/index.js');
 if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor/dsh-im-bridge 未 clone（CI 环境），跳过出站审计检查');
-  process.exit(0);
+  process.exit(2);
 }
 const src = readFileSync(INDEX, 'utf8');
 const fails = [];

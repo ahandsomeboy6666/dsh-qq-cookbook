@@ -14,7 +14,7 @@ const SETUP = join(ROOT, 'tools', 'setup.mjs');
 const src = readFileSync(SETUP, 'utf8');
 if (process.platform !== 'win32') {
   console.log('[SKIP] 非 Windows 环境（setup.mjs 依赖 PowerShell），跳过部署状态测试');
-  process.exit(0);
+  process.exit(2);
 }
 
 const fails = [];

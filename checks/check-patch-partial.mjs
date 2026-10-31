@@ -14,7 +14,7 @@ const fails = [];
 
 if (!existsSync(VENDOR)) {
   console.log('[SKIP] vendor 不存在（CI），跳过补丁部分失败测试');
-  process.exit(0);
+  process.exit(2);
 }
 
 // 复制 index.js 到临时目录，删掉一个补丁的标记（模拟只应用一半）

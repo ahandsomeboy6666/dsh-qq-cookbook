@@ -23,7 +23,7 @@ const pass = [];
 
 if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor 不存在（CI），跳过桥接并发测试');
-  process.exit(0);
+  process.exit(2);
 }
 const src = readFileSync(INDEX, 'utf8');
 
