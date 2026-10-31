@@ -12,7 +12,8 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const ROOT = join(import.meta.dirname, '..')
-const VENDOR = join(ROOT, 'vendor', 'dsh-im-bridge', 'index.js')
+const vendorArgIdx = process.argv.indexOf('--vendor')
+const VENDOR = vendorArgIdx >= 0 ? process.argv[vendorArgIdx + 1] : join(ROOT, 'vendor', 'dsh-im-bridge', 'index.js')
 const VENDOR_CTX = join(ROOT, 'vendor', 'dsh-im-bridge', 'operation-context.js')
 const VENDOR_FEATURES = join(ROOT, 'vendor', 'dsh-im-bridge', 'bridge-features.js')
 const PROFILE = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'profiles', 'desktop', 'cordis.patch.yml')
