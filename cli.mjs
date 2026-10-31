@@ -39,6 +39,7 @@ const SCRIPTS = {
   configRobust: 'checks/check-config-robust.mjs',
   configRecovery: 'checks/check-config-recovery.mjs',
   patchPartial: 'checks/check-patch-partial.mjs',
+  bridgeConcurrency: 'checks/check-bridge-concurrency.mjs',
   audit: 'checks/check-audit.mjs',
   logging: 'checks/check-logging.mjs',
   drill: 'checks/attack-drill.mjs',
@@ -53,7 +54,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -81,6 +82,7 @@ const LABELS = {
   configRobust: '配置健壮性',
   configRecovery: '配置恢复',
   patchPartial: '补丁部分失败',
+  bridgeConcurrency: '桥接并发/去重',
   audit: '出站审计',
   logging: '日志无密钥',
   drill: '攻击演练（静态）'

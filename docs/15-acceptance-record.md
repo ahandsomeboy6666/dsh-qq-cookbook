@@ -1121,3 +1121,12 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] 全量 `cli all` → 15/15
 
 **结论：测试清单里的「配置修改失败恢复」「补丁部分失败」已补上。**
+
+### 2026-10-31 桥接并发/去重
+
+- [x] `checks/check-bridge-concurrency.mjs` 静态：接收侧去重（seen + fingerprint）、按会话 inbox 队列、chatKeyValid、发送队列
+- [x] 实测（`--live`）：并发两条消息 → bridge.log `manual send` × 2（各自入队）
+- [x] `cli check` → **10/10**
+- 说明：接收侧真实投递去重需要 mock OneBot（上游职责），仓库提供静态 + 发送侧并发实测
+
+**结论：桥接层并发/去重已覆盖。**
