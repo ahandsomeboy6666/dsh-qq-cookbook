@@ -12,7 +12,7 @@ if (process.platform !== 'win32') {
 }
 
 const ROOT = dirname(import.meta.dirname);
-const tmpBase = 'E:/workspace/.tmp-no-dsh';
+const tmpBase = join(dirname(ROOT), '.tmp-no-dsh');
 mkdirSync(tmpBase, { recursive: true });
 const tmp = mkdtempSync(join(tmpBase, 'run-'));
 const fails = [];

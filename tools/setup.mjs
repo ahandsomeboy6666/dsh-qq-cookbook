@@ -230,7 +230,7 @@ async function repairNapcatShell(napcatDir) {
     console.log(`        补包失败，换下一个源…（${candidate.replace(/^https:\/\//, '').slice(0, 46)}）`)
   }
   if (!ok) throw new Error(`下载 Shell 包失败：${lastError}`)
-  const digest = await githubAssetDigest(defaults.napcatRepo, 'NapCat.Shell.zip')
+  const digest = await githubAssetDigest(defaults.napcatRepo, 'NapCat.Shell.zip', napcatVersion)
   if (digest.ok) {
     const actual = sha256FileSync(zip)
     if (actual !== digest.sha256) throw new Error(`NapCat 包 sha256 不符：期望 ${digest.sha256.slice(0, 16)}…，实际 ${actual.slice(0, 16)}…`)
@@ -346,9 +346,12 @@ async function sha512File(file) {
 /** 同步计算文件 SHA256（hex），用于 NapCat 包校验。 */
 function sha256FileSync(file) { return createHash('sha256').update(readFileSync(file)).digest('hex') }
 /** 通过 GitHub API 取 release asset 的 digest（sha256）。无 token 可能 403，调用方降级。 */
-async function githubAssetDigest(repo, assetName) {
+async function githubAssetDigest(repo, assetName, version = '') {
+  const releasePath = version
+    ? `releases/tags/${encodeURIComponent(version)}`
+    : 'releases/latest'
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+    const res = await fetch(`https://api.github.com/repos/${repo}/${releasePath}`, {
       headers: {
         'User-Agent': 'dsh-qq-cookbook',
         Accept: 'application/vnd.github+json',

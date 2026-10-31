@@ -15,3 +15,18 @@ jobs:
           node-version: 22
       - name: 静态门禁（资产 + 事实一致性）
         run: node cli.mjs check
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装依赖（yaml）
+        run: npm ci
+      - name: 静态门禁（含从零安装 / 无 DSH）
+        run: node cli.mjs check
+        env:
+          CI: true

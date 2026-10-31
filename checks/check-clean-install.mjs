@@ -35,7 +35,7 @@ if (!(await networkOk())) {
   process.exit(2);
 }
 
-const tmpBase = 'E:/workspace/.tmp-clean-install';
+const tmpBase = join(dirname(ROOT), '.tmp-clean-install');
 mkdirSync(tmpBase, { recursive: true });
 const tmp = mkdtempSync(join(tmpBase, 'run-'));
 const fails = [];

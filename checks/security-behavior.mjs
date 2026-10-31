@@ -27,6 +27,18 @@ const staticFail = [];
 const behaviorPass = [];
 const behaviorFail = [];
 
+async function outboxIds() {
+  const st = await (await fetch(`${DSH_URL}/im-bridge/features`, { signal: AbortSignal.timeout(8000) })).text();
+  const jobs = (() => { try { return JSON.parse(st).outbox || []; } catch { return []; } })();
+  return new Set(jobs.map((j) => j.id));
+}
+
+async function newJobsSince(before) {
+  const st = await (await fetch(`${DSH_URL}/im-bridge/features`, { signal: AbortSignal.timeout(8000) })).text();
+  const jobs = (() => { try { return JSON.parse(st).outbox || []; } catch { return []; } })();
+  return jobs.filter((j) => !before.has(j.id));
+}
+
 // ---------- 静态 ----------
 if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor 不存在（CI），跳过安全行为测试');
@@ -60,6 +72,7 @@ if (LIVE) {
       try { return String((JSON.parse(readFileSync(join(homedir(), '.dsh/im-bridge/settings.json'), 'utf8')).owners || [])[0] ?? ''); } catch { return ''; }
     })();
     if (owner) {
+      const before2 = await outboxIds();
       const r2 = await fetch(`${DSH_URL}/im-bridge/send`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -67,15 +80,16 @@ if (LIVE) {
         signal: AbortSignal.timeout(10000),
       });
       await r2.text();
-      await new Promise(r => setTimeout(r, 2000));
-      const st = await (await fetch(`${DSH_URL}/im-bridge/features`, { signal: AbortSignal.timeout(8000) })).text();
-      const jobs = (() => { try { return JSON.parse(st).outbox || []; } catch { return []; } })();
-      const blocked = jobs.some(j => /出站审计拦截/.test(String(j.error || '')));
-      blocked ? behaviorPass.push('B2 含路径消息被出站审计拦截') : behaviorFail.push('B2 含路径消息未被拦截');
+      await new Promise(r => setTimeout(r, 2500));
+      const fresh2 = await newJobsSince(before2);
+      fresh2.some((j) => /出站审计拦截/.test(String(j.error || '')))
+        ? behaviorPass.push(`B2 含路径消息被拦截（新 job ${fresh2.length} 条）`)
+        : behaviorFail.push(`B2 含路径消息未被拦截（新 job ${fresh2.length} 条）`);
     } else behaviorFail.push('B2 找不到 owner（settings.json）');
 
     // B4：正常消息必须仍能发出（证明审计不误杀；状态查 features 的 outbox）
     if (owner) {
+      const before4 = await outboxIds();
       const r4 = await fetch(`${DSH_URL}/im-bridge/send`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -84,12 +98,10 @@ if (LIVE) {
       });
       await r4.text();
       await new Promise(r => setTimeout(r, 3000));
-      const st4 = await (await fetch(`${DSH_URL}/im-bridge/features`, { signal: AbortSignal.timeout(8000) })).text();
-      const jobs4 = (() => { try { return JSON.parse(st4).outbox || []; } catch { return []; } })();
-      const sent = jobs4.slice(-3).some(j => j.status === 'sent');
-      const blocked = jobs4.slice(-3).some(j => /出站审计拦截/.test(String(j.error || '')));
-      sent ? behaviorPass.push('B4 正常消息发出（审计未误杀）') : behaviorFail.push(`B4 正常消息没有 sent 状态（最近：${jobs4.slice(-3).map(j => j.status).join(',')}）`);
-      if (blocked) behaviorPass.push('B4 最近仍有审计拦截记录（证明拦截生效）');
+      const fresh4 = await newJobsSince(before4);
+      fresh4.some((j) => j.status === 'sent')
+        ? behaviorPass.push(`B4 正常消息发出（新 job ${fresh4.length} 条，含 sent）`)
+        : behaviorFail.push(`B4 正常消息没有 sent（新 job：${fresh4.map((j) => j.status).join(',') || '无'}）`);
     }
 
     // B3：单实例锁
