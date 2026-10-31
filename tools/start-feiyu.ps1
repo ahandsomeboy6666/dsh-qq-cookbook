@@ -99,6 +99,9 @@ if (-not (Test-Port 8080)) {
     if (-not $srvReady) { $ttsServerOk = $false }
   } else { $ttsServerOk = $false }
 }
+# 语音参数（IndexTTS 2）：duration_scale=1.1 / volume=1.0 / bass=+5@200Hz
+# 这些参数写在 gateway.mjs 里（FILTER + options.duration_scale），启动时不需要额外设置。
+# 若听感变回「响/快/薄」，检查 gateway.mjs 的这三个值是否被改回默认。
 if ($ttsServerOk -and -not (Test-Port 8090)) {
   if (Test-Path $gateway) { Start-Process -FilePath 'node' -ArgumentList @('gateway.mjs') -WorkingDirectory $ttsDir -WindowStyle Hidden; Start-Sleep -Seconds 2 }
 }
