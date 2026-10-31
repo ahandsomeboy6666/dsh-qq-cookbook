@@ -36,6 +36,7 @@ const DRY = args.includes('--dry-run')
 const SKIP_MCP = args.includes('--skip-mcp')
 const NO_DOWNLOAD = args.includes('--no-download')
 const INSTALL_NAPCAT = args.includes('--install-napcat')
+const ALLOW_UNVERIFIED = args.includes('--allow-unverified')
 // GitHub 在国内经常连不上：直连失败就自动换镜像。
 // 顺序：GITHUB_MIRROR 环境变量 > --mirror 参数 > 直连 > 常用镜像。
 const MIRROR_ARG = argValue('--mirror') || process.env.GITHUB_MIRROR || ''
@@ -151,8 +152,7 @@ function napcatBundledQQ(dir) {
   const exe = join(dir, 'QQ.exe')
   if (!existsSync(exe)) return ''
   try {
-    const v = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-      `(Get-Item '${exe}').VersionInfo.FileVersion`], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
+    const v = psRun('(Get-Item $Exe).VersionInfo.FileVersion', { Exe: exe }, 15000)
     return String(v.stdout ?? '').trim()
   } catch {
     return '未知版本'
@@ -181,8 +181,7 @@ function detectInstalledQQ() {
   for (const exe of ['D:\\Program Files\\QQ.exe', 'C:\\Program Files\\Tencent\\QQNT\\QQ.exe', 'C:\\Program Files (x86)\\Tencent\\QQNT\\QQ.exe']) {
     if (!existsSync(exe)) continue
     try {
-      const v = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-        `(Get-Item '${exe}').VersionInfo.FileVersion`], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
+      const v = psRun('(Get-Item $Exe).VersionInfo.FileVersion', { Exe: exe }, 15000)
       const got = String(v.stdout ?? '').trim()
       if (/^\d+\.\d+\.\d+/.test(got)) return got
     } catch { /* ignore */ }
@@ -203,7 +202,11 @@ function sameQQVersion(a, b) {
  * 这个包里没有 QQ.exe，解压进现有目录不会覆盖宿主。
  */
 async function repairNapcatShell(napcatDir) {
-  const url = `https://github.com/${defaults.napcatRepo}/releases/latest/download/NapCat.Shell.zip`
+  const napcatVersion = String(defaults.napcatVersion ?? '').trim()
+  const napcatUrl = napcatVersion
+    ? `https://github.com/${defaults.napcatRepo}/releases/download/${napcatVersion}/NapCat.Shell.zip`
+    : `https://github.com/${defaults.napcatRepo}/releases/latest/download/NapCat.Shell.zip`
+  const url = napcatUrl
   const cacheDir = join(ROOT, 'tools', 'napcat')
   await mkdir(cacheDir, { recursive: true })
   const zip = join(cacheDir, 'NapCat.Shell.zip')
@@ -231,8 +234,10 @@ async function repairNapcatShell(napcatDir) {
     const actual = sha256FileSync(zip)
     if (actual !== digest.sha256) throw new Error(`NapCat 包 sha256 不符：期望 ${digest.sha256.slice(0, 16)}…，实际 ${actual.slice(0, 16)}…`)
     console.log('        NapCat 包 sha256 校验通过')
+  } else if (ALLOW_UNVERIFIED) {
+    console.log(`        ⚠ 未校验 NapCat 包摘要（${digest.reason}，--allow-unverified）`)
   } else {
-    console.log(`        ⚠ 无法获取 GitHub digest（${digest.reason}），降级为结构校验`)
+    throw new Error(`无法获取 NapCat 包摘要（${digest.reason}）。请设置 GITHUB_TOKEN 后重试；确认风险可加 --allow-unverified 继续`)
   }
   const bytes = statSync(zip).size
   const unzip = psRun('Expand-Archive -LiteralPath $Zip -DestinationPath $Dest -Force', { Zip: zip, Dest: napcatDir })

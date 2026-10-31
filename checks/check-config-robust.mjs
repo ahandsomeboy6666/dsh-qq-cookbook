@@ -34,20 +34,33 @@ if (existsSync(local)) {
   pass.push('个人配置不存在（未部署，用模板）');
 }
 
-// 3. init 幂等：已有 local 时不应覆盖（模拟：复制到临时目录，跑 init 逻辑不变）
+// 3. init 幂等：子进程真测（复制 cli.mjs + 模板到临时目录）
 try {
-  const tmp = mkdtempSync(join(tmpdir(), 'cfg-'));
-  const tmpLocal = join(tmp, 'config.local.json');
-  copyFileSync(example, tmpLocal);
-  const before = readFileSync(tmpLocal, 'utf8');
-  // 简化断言：cli.mjs init 在本地已有 config.local.json 时的行为由代码保证（existsSync 早退）
-  const cli = readFileSync(join(ROOT, 'cli.mjs'), 'utf8');
-  if (!/existsSync\(local\)/.test(cli)) fails.push('cli.mjs init 没有「已存在不覆盖」判断');
-  else pass.push('init 幂等逻辑存在');
-  if (readFileSync(tmpLocal, 'utf8') !== before) fails.push('init 幂等模拟失败');
+  const { copyFileSync, mkdtempSync, readFileSync, rmSync, existsSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const cliSrc = join(ROOT, 'cli.mjs');
+  const tmp = mkdtempSync(join(tmpdir(), 'cfg-init-'));
+  copyFileSync(cliSrc, join(tmp, 'cli.mjs'));
+  copyFileSync(example, join(tmp, 'config.example.json'));
+
+  const r1 = spawnSync(process.execPath, [join(tmp, 'cli.mjs'), 'init'], { cwd: tmp, encoding: 'utf8', timeout: 30000 });
+  const firstFile = join(tmp, 'config.local.json');
+  if (r1.status !== 0) fails.push('首次 init 失败：' + String(r1.stderr ?? '').slice(0, 120));
+  else if (!existsSync(firstFile)) fails.push('首次 init 没有生成 config.local.json');
+  else pass.push('首次 init 生成配置');
+
+  const before = existsSync(firstFile) ? readFileSync(firstFile, 'utf8') : '';
+  const r2 = spawnSync(process.execPath, [join(tmp, 'cli.mjs'), 'init'], { cwd: tmp, encoding: 'utf8', timeout: 30000 });
+  const after = existsSync(firstFile) ? readFileSync(firstFile, 'utf8') : '';
+  if (r2.status !== 0) fails.push('第二次 init 失败：' + String(r2.stderr ?? '').slice(0, 120));
+  else if (after !== before) fails.push('第二次 init 覆盖了已有配置');
+  else pass.push('第二次 init 未覆盖（幂等）');
+  if (!/已存在/.test(String(r2.stdout ?? ''))) fails.push('第二次 init 没有提示「已存在」');
+  else pass.push('第二次 init 明确提示已存在');
   rmSync(tmp, { recursive: true, force: true });
 } catch (e) {
-  fails.push('init 幂等模拟异常：' + String(e?.message ?? e).slice(0, 80));
+  fails.push('init 子进程测试异常：' + String(e?.message ?? e).slice(0, 100));
 }
 
 for (const p of pass) console.log('[PASS] ' + p);
