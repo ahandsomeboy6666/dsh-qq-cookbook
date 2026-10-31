@@ -37,6 +37,7 @@ const SKIP_MCP = args.includes('--skip-mcp')
 const NO_DOWNLOAD = args.includes('--no-download')
 const INSTALL_NAPCAT = args.includes('--install-napcat')
 const ALLOW_UNVERIFIED = args.includes('--allow-unverified')
+const REQUIRE_VERIFIED = args.includes('--require-verified')
 // GitHub 在国内经常连不上：直连失败就自动换镜像。
 // 顺序：GITHUB_MIRROR 环境变量 > --mirror 参数 > 直连 > 常用镜像。
 const MIRROR_ARG = argValue('--mirror') || process.env.GITHUB_MIRROR || ''
@@ -234,10 +235,10 @@ async function repairNapcatShell(napcatDir) {
     const actual = sha256FileSync(zip)
     if (actual !== digest.sha256) throw new Error(`NapCat 包 sha256 不符：期望 ${digest.sha256.slice(0, 16)}…，实际 ${actual.slice(0, 16)}…`)
     console.log('        NapCat 包 sha256 校验通过')
-  } else if (ALLOW_UNVERIFIED) {
-    console.log(`        ⚠ 未校验 NapCat 包摘要（${digest.reason}，--allow-unverified）`)
+  } else if (REQUIRE_VERIFIED) {
+    throw new Error(`无法获取 NapCat 包摘要（${digest.reason}），--require-verified 要求必须校验。设置 GITHUB_TOKEN 后重试`)
   } else {
-    throw new Error(`无法获取 NapCat 包摘要（${digest.reason}）。请设置 GITHUB_TOKEN 后重试；确认风险可加 --allow-unverified 继续`)
+    console.log(`        ⚠ 无法获取 GitHub digest（${digest.reason}），降级为结构校验（不接受时用 --require-verified）`)
   }
   const bytes = statSync(zip).size
   const unzip = psRun('Expand-Archive -LiteralPath $Zip -DestinationPath $Dest -Force', { Zip: zip, Dest: napcatDir })

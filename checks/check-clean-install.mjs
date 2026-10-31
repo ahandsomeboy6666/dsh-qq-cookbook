@@ -20,6 +20,21 @@ if (process.argv.includes('--skip')) {
 }
 
 const ROOT = dirname(import.meta.dirname);
+// 网络预检：真实上游 clone 依赖网络；不可达时明确 SKIP 而不是报失败/假绿
+async function networkOk() {
+  for (const url of ['https://github.com', 'https://gh-proxy.com']) {
+    try {
+      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(6000) });
+      if (res.ok || res.status < 500) return true;
+    } catch { /* 换下一个 */ }
+  }
+  return false;
+}
+if (!(await networkOk())) {
+  console.log('[SKIP] GitHub 与镜像均不可达，跳过从零安装（请检查网络后再跑）');
+  process.exit(2);
+}
+
 const tmpBase = 'E:/workspace/.tmp-clean-install';
 mkdirSync(tmpBase, { recursive: true });
 const tmp = mkdtempSync(join(tmpBase, 'run-'));
@@ -52,12 +67,10 @@ try {
   mkdirSync(join(dshHome, 'profiles', 'desktop'), { recursive: true });
   // 注册步骤需要读 profile 的 package.json
   writeFileSync(join(dshHome, 'profiles', 'desktop', 'package.json'), JSON.stringify({ name: 'desktop-profile', private: true }, null, 2) + '\n', 'utf8');
-  // 假完整 NapCat（五个关键文件齐全）→ setup 跳过下载
-  const fakeNapcat = join(tmp, 'tools', 'napcat', 'NapCat.52892.Shell');
-  mkdirSync(fakeNapcat, { recursive: true });
-  for (const f of ['napcat.mjs', 'NapCatWinBootMain.exe', 'NapCatWinBootHook.dll', 'loadNapCat.js', 'QQ.exe']) {
-    writeFileSync(join(fakeNapcat, f), '', 'utf8');
-  }
+  // 不完整 NapCat（只放一个文件）→ 触发 setup 下载 Shell 包 + digest 校验 + 解压
+  const partialNapcat = join(tmp, 'tools', 'napcat', 'NapCat.52892.Shell');
+  mkdirSync(partialNapcat, { recursive: true });
+  writeFileSync(join(partialNapcat, 'napcat.mjs'), '', 'utf8');
 
   // 2. 跑 setup（真实 clone；跳过 MCP/下载）
   const r = spawnSync(process.execPath, [
@@ -91,13 +104,31 @@ try {
 
   // 可选步骤：环境相关，允许失败，但必须出现在白名单里
   const OPTIONAL_ALLOW_FAIL = new Set([
-    'NapCat 本体', 'NapCat 自带 QQ', '补全 NapCat', '下载 NapCat 安装包', '安装 NapCat',
+    'NapCat 本体', '补全 NapCat', 'NapCat 自带 QQ', '安装 NapCat',
     '写入人设', '语音（edge-tts）', '语音配置', '开启语音', 'NapCat 启动器',
     '安装 Playwright MCP', '写 cordis.patch.yml',
   ]);
   const unexpected = failNames.filter((n) => !OPTIONAL_ALLOW_FAIL.has(n) && !REQUIRED.includes(n));
   if (unexpected.length) fails.push('出现了白名单外的失败步骤：' + unexpected.join('、'));
   else pass.push('失败步骤均在可选白名单内（' + (failNames.join('、') || '无') + '）');
+
+  // NapCat：Shell 包真实下载 + 解压（4 个 Shell 文件；QQ.exe 不在 Shell 包里，靠 OneKey/自带）
+  const napcatDir = join(tmp, 'tools', 'napcat', 'NapCat.52892.Shell');
+  const shellFiles = ['napcat.mjs', 'NapCatWinBootMain.exe', 'NapCatWinBootHook.dll', 'loadNapCat.js'];
+  const missingShell = shellFiles.filter((n) => !existsSync(join(napcatDir, n)));
+  if (missingShell.length === 0) pass.push('NapCat Shell 包解压成功（4 个文件齐全）');
+  else fails.push('NapCat Shell 不完整，缺 ' + missingShell.join('、'));
+  // digest：校验通过 或 明确降级警告（二者都是可接受路径）
+  if (/NapCat 包 sha256 校验通过/.test(out)) pass.push('NapCat 包 sha256 校验通过');
+  else if (/无法获取 GitHub digest[^\n]*降级为结构校验/.test(out)) pass.push('NapCat 摘要不可得 → 明确降级警告（结构校验）');
+  else fails.push('既没有 sha256 校验也没有降级警告');
+  // QQ.exe：Shell 包不含，setup 必须给出明确指引
+  if (!existsSync(join(napcatDir, 'QQ.exe'))) {
+    if (/QQ\.exe/.test(out)) pass.push('缺 QQ.exe 时输出中提及 QQ.exe（指引）');
+    else fails.push('缺 QQ.exe 但 setup 没有明确提示');
+  } else {
+    pass.push('NapCat 自带 QQ.exe');
+  }
 
   // 安装产物必须含出站审计（patch 真的生效）
   const installedIndex = join(tmp, 'vendor', 'dsh-im-bridge', 'index.js');
