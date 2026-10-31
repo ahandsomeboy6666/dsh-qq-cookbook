@@ -1109,3 +1109,15 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] 冒烟不进门禁（会发消息），手动跑：`node checks/smoke.mjs --url <DSH端口> [--voice]`
 
 **结论：部署后冒烟、配置边界、补丁版本三类测试已就位。**
+
+### 2026-10-31 测试补强（配置恢复 + 补丁部分失败）
+
+- [x] `checks/check-config-recovery.mjs`：cheems `saveSettings` 原子写（tmp + rename）断言；模拟写失败后原文件不变
+  - 实测：2/2 通过
+- [x] `checks/check-patch-partial.mjs`：临时副本删掉 P1 标记 → 断言逐条 MISS + 非 0 退出
+  - 实测：通过
+- [x] `check-patches.mjs` 支持 `--vendor`（便于测试）
+- [x] `cli check` → **9/9**
+- [x] 全量 `cli all` → 15/15
+
+**结论：测试清单里的「配置修改失败恢复」「补丁部分失败」已补上。**
