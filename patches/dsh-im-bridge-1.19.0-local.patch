@@ -28,7 +28,7 @@ index 587a624..8a6c6e6 100644
  export function describeSharedCard(card) {
    const label=card.kind==='music'?'音乐':card.kind==='video'?'视频':'链接';
 diff --git a/index.js b/index.js
-index 83d8357..75ac99f 100644
+index 83d8357..dd60ab1 100644
 --- a/index.js
 +++ b/index.js
 @@ -147,6 +147,23 @@ function normalizeAfterthought(value) {
@@ -259,9 +259,17 @@ index 83d8357..75ac99f 100644
        } else {
          return { action, rejected: 'unknown-action' };
        }
-@@ -4146,9 +4229,11 @@ export function apply(ctx, rawConfig) {
+@@ -4141,14 +4224,19 @@ export function apply(ctx, rawConfig) {
+     const bursts = splitBursts(protectedBody, cfg.maxReplyChars,{...settings.companion,richInput:auditById(chat.auditId)?.richInput===true});
+     const chunks = (cfg.plainText ? bursts.map((burst) => renderForChat(burst)) : bursts).filter((chunk) => chunk !== '').map(chunk=>chunk.replace(/\uE200PIC(\d+)\uE201/g,(_mark,index)=>pictureCommands[Number(index)]||''));
+     if (chunks.length === 0) return;
++    // 用户明确要语音时只回语音（不额外发文字 chunk）
++    const voiceOnlyRequest = explicitlyRequestsVoice(String(auditById(chat.auditId)?.userWords || ''));
+     chat.sendChain = chat.sendChain.then(async () => {
+       for (let index = 0; index < chunks.length; index += 1) {
          if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)||auditById(chat.auditId)?.status==='superseded') return;
          let chunk = chunks[index];
++        if (voiceOnlyRequest && !/^\s*\[语音/.test(chunk)) continue;
          if (index > 0) {
 -          // The pause between two bubbles is what makes it read like someone
 -          // typing rather than one paragraph being pasted in.
@@ -274,7 +282,7 @@ index 83d8357..75ac99f 100644
            await new Promise((resolve) => setTimeout(resolve, pause));
          }
          if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)) return;
-@@ -4246,6 +4331,18 @@ export function apply(ctx, rawConfig) {
+@@ -4246,6 +4334,18 @@ export function apply(ctx, rawConfig) {
          // a successful render it degrades to plain text instead of vanishing.
          let voiceFile = null;
          let voiceShare=null;
@@ -293,7 +301,7 @@ index 83d8357..75ac99f 100644
          const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
          if (voiceMark) {
            const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
-@@ -4287,6 +4384,15 @@ export function apply(ctx, rawConfig) {
+@@ -4287,6 +4387,15 @@ export function apply(ctx, rawConfig) {
            sendSegments(chat,groups[group]);
          }
        }
@@ -309,7 +317,7 @@ index 83d8357..75ac99f 100644
      }).catch((error) => log(`send failed: ${error?.message ?? error}`));
    }
    /* ---------------- NapCat 掉线自愈 ---------------- */
-@@ -4532,7 +4638,9 @@ export function apply(ctx, rawConfig) {
+@@ -4532,7 +4641,9 @@ export function apply(ctx, rawConfig) {
        const request = { cwd: workspace };
        // A character's voice must not select the old tool-free chat composition.
        if (chat.isOwner === true) request.agentPreset = 'standard';
@@ -320,7 +328,7 @@ index 83d8357..75ac99f 100644
        const created = await ctx.sessionController.create(request);
        state.chats[chat.key] = {
          sessionId: created.sessionId,
-@@ -4649,7 +4757,7 @@ export function apply(ctx, rawConfig) {
+@@ -4649,7 +4760,7 @@ export function apply(ctx, rawConfig) {
          );
        }
        preambleParts.push(imageCapabilityHint());
@@ -329,7 +337,7 @@ index 83d8357..75ac99f 100644
        // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
        const instructions=preambleParts.join('\n\n');
        // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
-@@ -4760,6 +4868,92 @@ export function apply(ctx, rawConfig) {
+@@ -4760,6 +4871,92 @@ export function apply(ctx, rawConfig) {
      chats.set(sessionId, chat);
    }
  
@@ -422,7 +430,7 @@ index 83d8357..75ac99f 100644
    /* ---------------- inbound ---------------- */
  
    async function handlePayloadCore(payload) {
-@@ -4795,7 +4989,7 @@ export function apply(ctx, rawConfig) {
+@@ -4795,7 +4992,7 @@ export function apply(ctx, rawConfig) {
          log(`denied group ${groupId}`);
          return;
        }
@@ -431,7 +439,7 @@ index 83d8357..75ac99f 100644
      } else if (!effectiveUsers().includes(userId)) {
        log(`denied private user ${userId}`);
        const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
-@@ -4817,8 +5011,104 @@ export function apply(ctx, rawConfig) {
+@@ -4817,8 +5014,104 @@ export function apply(ctx, rawConfig) {
      };
      const activeChat=chats.get(state.chats[key]?.sessionId);
      if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
@@ -537,7 +545,7 @@ index 83d8357..75ac99f 100644
      if (text === '' && !carriesImage) return;
  
      if (text === '/new' || text === '／new' || text === '/reset') {
-@@ -5017,6 +5307,11 @@ export function apply(ctx, rawConfig) {
+@@ -5017,6 +5310,11 @@ export function apply(ctx, rawConfig) {
        } else if (segment?.type === 'video') {if(!await addVideoContent(segment.data||{},content,notes,chatKey))uncertain=true;}
        else if (segment?.type === 'file') { notes.push('收到文件：' + String(segment.data?.name || segment.data?.file || '未命名').slice(0,200) + '；文件正文未读取。'); uncertain = true; }
      }
@@ -549,7 +557,7 @@ index 83d8357..75ac99f 100644
      if (shared.text) notes.push(shared.text);
      if (notes.length) content.unshift({ type: 'text', text: notes.join('\n\n') });
      content.uncertain = uncertain || shared.references.some(reference=>reference.mediaStatus==='failed'||['failed','partial'].includes(reference.status));
-@@ -5388,9 +5683,10 @@ export function apply(ctx, rawConfig) {
+@@ -5388,9 +5686,10 @@ export function apply(ctx, rawConfig) {
  
    /** Ask the model to say something on its own; `[skip]` means it stayed quiet. */
    async function nudge(chat, cue, kind,options={}) {
@@ -563,7 +571,7 @@ index 83d8357..75ac99f 100644
      if (typeof chat.sessionId !== 'string') return;
      const budget=autonomyState();budget.counts.chats++;budget.lastActionAt=Date.now();saveState();
      chat.proactivePending = true;
-@@ -5430,9 +5726,10 @@ export function apply(ctx, rawConfig) {
+@@ -5430,9 +5729,10 @@ export function apply(ctx, rawConfig) {
      const minutes = minMinutes + Math.random() * Math.max(1, maxMinutes - minMinutes);
      chat.silenceTimer = setTimeout(() => {
        chat.silenceTimer = null;
@@ -577,7 +585,7 @@ index 83d8357..75ac99f 100644
        void nudge(chat, cfg.silence.cue, 'silence').then(accepted=>{if(accepted)chat.nudges=(chat.nudges||0)+1;});
      }, Math.round(minutes * 60_000));
      log(`silence nudge armed in ~${Math.round(minutes)} min`);
-@@ -5715,6 +6012,20 @@ export function apply(ctx, rawConfig) {
+@@ -5715,6 +6015,20 @@ export function apply(ctx, rawConfig) {
      else logMessage({ dir: 'out', chat: job.chat, text: text.slice(0,20000), localId: job.id, ...entry });
      if(job.status==='sent')recordCalendarRow({...existing,time:job.at,dir:'out',chat:job.chat,text,localId:job.id,personaId:job.personaId||auditById(job.auditId)?.persona||activePersona(job.chat).id,...entry});
    }
@@ -598,7 +606,7 @@ index 83d8357..75ac99f 100644
    function queueOutgoing(chat, segments, previousId = '') {
      if (!Array.isArray(segments) || !segments.length) return null;
      const origin = auditById(chat.auditId);if(origin?.status==='superseded')return null;if(origin&&origin.accountId!==(settings.activeAccountId||''))return null;
-@@ -5748,7 +6059,11 @@ export function apply(ctx, rawConfig) {
+@@ -5748,7 +6062,11 @@ export function apply(ctx, rawConfig) {
          guardState.lastSendAt = Date.now(); guardState.windowCount += 1;
          try {
            const wireSegments = outgoingImageSegments(job.segments);
@@ -610,7 +618,7 @@ index 83d8357..75ac99f 100644
            const result = await request('send_msg', params, 15000);
            if (job.status === 'cancelled') continue;
            job.messageId = result?.message_id !== undefined ? String(result.message_id) : '';
-@@ -5775,7 +6090,12 @@ export function apply(ctx, rawConfig) {
+@@ -5775,7 +6093,12 @@ export function apply(ctx, rawConfig) {
      return payload.message_type === 'group' ? effectiveGroups().includes(group) && (!cfg.groupRequireAt || mentionsSelf(payload.message, payload.self_id)) : effectiveUsers().includes(user);
    }
    function handlePayload(payload) {
@@ -624,7 +632,7 @@ index 83d8357..75ac99f 100644
      const key = `${payload.message_type === 'group' ? 'group' : 'private'}:${payload.message_type === 'group' ? payload.group_id : payload.user_id}`;
      const id = payload.message_id !== undefined ? `${payload.self_id}:${key}:${payload.message_id}` : randomUUID();
      if (featureState.inbox.some(job => job.id === id)) return;
-@@ -5785,7 +6105,9 @@ export function apply(ctx, rawConfig) {
+@@ -5785,7 +6108,9 @@ export function apply(ctx, rawConfig) {
      const now=Date.now(),firstQueued=featureState.inbox.find(j=>j.key===key&&j.status==='queued');
      const ms=mergeable(payload)?debounceDelay(settings.companion.enabled?settings.companion.waitMode:'off',conversationStates()[key]?.lastSeen,firstQueued?.at||now,now,{mergedMs:settings.reliability.mergeMs,urgent:settings.reliability.mergeMs===0}):0;
      if (inboxTimers.has(key)) clearTimeout(inboxTimers.get(key));
@@ -635,7 +643,7 @@ index 83d8357..75ac99f 100644
    }
    async function drainInbox(key) {
      if (inboxRunning.has(key) || stopped || accountPaused) return;
-@@ -5909,7 +6231,7 @@ export function apply(ctx, rawConfig) {
+@@ -5909,7 +6234,7 @@ export function apply(ctx, rawConfig) {
      if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
      const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
      const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
