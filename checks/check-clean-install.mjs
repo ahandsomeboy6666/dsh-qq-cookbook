@@ -5,7 +5,7 @@
  * 用法：node checks/check-clean-install.mjs [--skip]   （--skip 跳过真实 clone）
  * 说明：会真实 clone 一次插件（约 30MB，走镜像），约 1–3 分钟。
  */
-import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -48,11 +48,22 @@ try {
     if (existsSync(join(ROOT, dir))) cpSync(join(ROOT, dir), join(tmp, dir), { recursive: true });
   }
   mkdirSync(join(tmp, 'tools'), { recursive: true });
-  // setup.mjs 依赖 yaml（根 node_modules）：用 junction 挂过去
-  if (existsSync(join(ROOT, 'node_modules'))) {
-    try { symlinkSync(join(ROOT, 'node_modules'), join(tmp, 'node_modules'), 'junction'); } catch { /* 已存在 */ }
+  // 完全独立环境：复制 package.json/lock 并真实安装依赖（不用宿主机 node_modules）
+  for (const name of ['package.json', 'package-lock.json']) {
+    if (existsSync(join(ROOT, name))) cpSync(join(ROOT, name), join(tmp, name));
   }
-  if (existsSync(join(ROOT, 'package.json'))) cpSync(join(ROOT, 'package.json'), join(tmp, 'package.json'));
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const install = spawnSync(npm, ['install', '--no-audit', '--no-fund'], {
+    cwd: tmp,
+    encoding: 'utf8',
+    timeout: 300000,
+    shell: process.platform === 'win32',
+  });
+  if (install.status !== 0) {
+    fails.push('临时环境 npm install 失败：' + String(install.stderr ?? '').slice(0, 160));
+  } else {
+    pass.push('临时环境 npm install 成功');
+  }
   cpSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
   // 真实上游 clone（不依赖本机 vendor）
   if (existsSync(join(ROOT, 'tools', '一键启动肥鱼.bat'))) cpSync(join(ROOT, 'tools', '一键启动肥鱼.bat'), join(tmp, 'tools', '一键启动肥鱼.bat'));

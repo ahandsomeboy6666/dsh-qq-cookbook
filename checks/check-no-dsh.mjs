@@ -2,7 +2,7 @@
 /**
  * 陌生人无 DSH 场景：setup 必须给出明确指引（不是崩溃），并阻断后续步骤。
  */
-import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -24,10 +24,18 @@ try {
   cpSync(join(ROOT, 'config'), join(tmp, 'config'), { recursive: true });
   mkdirSync(join(tmp, 'tools'), { recursive: true });
   cpSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
-  if (existsSync(join(ROOT, 'node_modules'))) {
-    try { symlinkSync(join(ROOT, 'node_modules'), join(tmp, 'node_modules'), 'junction'); } catch { /* ignore */ }
+  // 完全独立：复制 package.json/lock 并安装依赖
+  for (const name of ['package.json', 'package-lock.json']) {
+    if (existsSync(join(ROOT, name))) cpSync(join(ROOT, name), join(tmp, name));
   }
-  if (existsSync(join(ROOT, 'package.json'))) cpSync(join(ROOT, 'package.json'), join(tmp, 'package.json'));
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const install = spawnSync(npm, ['install', '--no-audit', '--no-fund'], {
+    cwd: tmp,
+    encoding: 'utf8',
+    timeout: 300000,
+    shell: process.platform === 'win32',
+  });
+  if (install.status !== 0) fails.push('临时环境 npm install 失败：' + String(install.stderr ?? '').slice(0, 160));
 
   const r = spawnSync(process.execPath, [
     join(tmp, 'tools', 'setup.mjs'),
