@@ -16,11 +16,11 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
 
@@ -215,9 +215,11 @@ async function repairNapcatShell(napcatDir) {
   let lastError = ''
   for (const candidate of fast) {
     rmSync(zip, { force: true })
-    const dl = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-      `$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -Uri '${candidate}' -OutFile '${zip}' -UseBasicParsing -TimeoutSec 150; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }`],
-    { encoding: 'utf8', windowsHide: true, timeout: 180000 })
+    const dl = psRun(
+      'try { Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing -TimeoutSec 150; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }',
+      { Url: candidate, Out: zip },
+      180000,
+    )
     if (dl.status === 0 && existsSync(zip) && statSync(zip).size > 5 * 1024 * 1024) { ok = true; break }
     lastError = String(dl.stderr ?? '').trim().slice(0, 120) || `退出码 ${dl.status}`
     console.log(`        补包失败，换下一个源…（${candidate.replace(/^https:\/\//, '').slice(0, 46)}）`)
@@ -232,8 +234,7 @@ async function repairNapcatShell(napcatDir) {
     console.log(`        ⚠ 无法获取 GitHub digest（${digest.reason}），降级为结构校验`)
   }
   const bytes = statSync(zip).size
-  const unzip = run('powershell.exe', ['-NoProfile', '-Command',
-    `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${napcatDir}' -Force`])
+  const unzip = psRun('Expand-Archive -LiteralPath $Zip -DestinationPath $Dest -Force', { Zip: zip, Dest: napcatDir })
   if (unzip.status !== 0) throw new Error('解压失败：' + String(unzip.stderr ?? '').slice(0, 140))
   for (const name of ['package.json', 'napcat.mjs', 'napcat.quick.bat']) {
     if (!existsSync(join(napcatDir, name))) throw new Error('NapCat 包结构不完整：缺少 ' + name)
@@ -269,7 +270,7 @@ async function downloadNapcatOneKey() {
   let bytes = 0
   for await (const chunk of res.body) { await fh.write(chunk); bytes += chunk.length }
   await fh.close()
-  const unzip = run('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${dir}' -Force`])
+  const unzip = psRun('Expand-Archive -LiteralPath $Zip -DestinationPath $Dest -Force', { Zip: zip, Dest: dir })
   if (unzip.status !== 0) throw new Error('解压失败：' + String(unzip.stderr ?? '').slice(0, 120))
   await rm(zip, { force: true })
   return { dir, bytes }
@@ -357,9 +358,22 @@ async function githubAssetDigest(repo, assetName) {
   } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 120) } }
 }
 
+/** 单引号转义，供 PowerShell 变量赋值用（避免把路径拼进命令串）。 */
+function psQuote(value) { return "'" + String(value).replace(/'/g, "''") + "'" }
+/** 写临时 .ps1 并以 -File 执行；路径/URL 作为变量传入，不做命令字符串拼接。 */
+function psRun(body, vars = {}, timeout = 180000) {
+  const assign = Object.entries(vars).map(([k, v]) => `${k} = ${psQuote(v)}`).join('\n')
+  const file = join(tmpdir(), `dsh-ps-${randomUUID()}.ps1`)
+  writeFileSync(file, '\uFEFF' + "$ProgressPreference='SilentlyContinue'\n[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n" + assign + '\n' + body, 'utf8')
+  try {
+    return spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file], { encoding: 'utf8', windowsHide: true, timeout })
+  } finally { try { rmSync(file, { force: true }) } catch { /* ignore */ } }
+}
+
 function run(cmd, argv, cwd) {
   // Windows 下 npm/npx 是 .cmd，spawnSync 必须走 shell 才能执行
-  return spawnSync(cmd, argv, { cwd, encoding: 'utf8', windowsHide: true, timeout: 180000, shell: process.platform === 'win32' })
+  const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(cmd)
+  return spawnSync(cmd, argv, { cwd, encoding: 'utf8', windowsHide: true, timeout: 180000, shell: needsShell })
 }
 async function backup(file) {
   if (DRY || !(await exists(file))) return

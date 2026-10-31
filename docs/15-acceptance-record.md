@@ -1130,3 +1130,13 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - 说明：接收侧真实投递去重需要 mock OneBot（上游职责），仓库提供静态 + 发送侧并发实测
 
 **结论：桥接层并发/去重已覆盖。**
+
+### 2026-10-31 PR1 命令构造与下载安全
+
+- [x] setup.mjs：PowerShell 调用改为 `psRun`（写临时 .ps1，路径/URL 作为变量，不做命令字符串拼接）
+- [x] `psQuote` 单引号转义；.ps1 带 BOM + `[Console]::OutputEncoding = UTF8`（中文路径不乱码）
+- [x] 下载/解压全部走 psRun；`run()` 只对 .cmd/.bat 用 shell
+- [x] `checks/check-cmd-safety.mjs`：静态（无 -Command 插值）+ 特殊字符往返（空格/单引号/中文/符号）
+- [x] `cli check` → **11/11**
+
+**结论：PR1 完成。**
