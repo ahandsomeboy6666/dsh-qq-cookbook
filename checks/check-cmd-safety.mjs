@@ -14,6 +14,11 @@ import { randomUUID } from 'node:crypto';
 const ROOT = dirname(import.meta.dirname);
 const SETUP = join(ROOT, 'tools', 'setup.mjs');
 const src = readFileSync(SETUP, 'utf8');
+if (process.platform !== 'win32') {
+  console.log('[SKIP] 非 Windows 环境，跳过命令构造安全测试');
+  process.exit(0);
+}
+
 const fails = [];
 const pass = [];
 
