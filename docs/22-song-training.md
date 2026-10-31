@@ -61,3 +61,25 @@ ffmpeg -i converted.wav -i no_vocals.wav -filter_complex amix=inputs=2 out.mp3
 - DirectML **只能推理，不能训练**（README 明确）
 - 训练集要中性（情绪污染音色）
 - so-vits 32k 模型推理更快、显存更小
+
+## 七、2026-11-01 实测结论（重要）
+
+### so-vits 路线：效果不达标（已停）
+
+- 训练：200 条 TTS 语音（火山 24k）→ 13000 步（G_13000），云 GPU 约 3 小时
+- 推理：本地 CPU 6 秒/25 秒音频（可接受）
+- **效果**：吐字不清（转换源 + 模型失真）、音色偏亮（质心 1613 vs IndexTTS 1325）
+- EQ 补偿（bass +4 / 1k-2k +3 / 4k-8k -5）能把质心压到 1373，但吐字问题改不了
+- **结论**：so-vits 不适合「TTS 合成音训练 + 唱歌转换」
+
+### RVC 路线：环境冲突（未跑通）
+
+- 云服务器（py3.11 + cu121）与 RVC 依赖（py312 + cu118）冲突：torch 被升级、fairseq 缺失
+- **正确环境**：Python 3.10 + CUDA 11.8 镜像（RVC 兼容）
+- 9070XT 只能推理（DirectML），训练必须 NVIDIA GPU
+
+### 教训
+
+1. 训练数据用 TTS 合成音（24k 上采样 32k）会引入高频伪影
+2. 训练前先确认镜像版本（RVC 对 py/cu 版本敏感）
+3. 云 GPU 按小时计费，环境折腾的成本比训练本身高
