@@ -179,11 +179,14 @@ function dshDirsFromDrives() {
 
 /** 找已安装的桌面端目录；找不到返回空串 */
 async function findDsh() {
-  // 显式指定优先，但设错了不该直接判死——继续往下找。
+  // DSH_DESKTOP_DIR 是显式指定：只认它。这样「多安装路径」和「测试未安装分支」都确定。
+  // 设错了就报出来并停在这里，不再偷偷去找别的——否则用户以为在用指定目录，实际不是。
   const envDir = process.env.DSH_DESKTOP_DIR
   if (envDir) {
     if (isDshDir(envDir)) return envDir
-    console.log(`  提示：DSH_DESKTOP_DIR 指向的目录不像桌面端（${envDir}），继续自动查找…`)
+    console.log(`  提示：DSH_DESKTOP_DIR 指向的目录不像桌面端（${envDir}）`)
+    console.log('        如果这个变量是误设的，删掉它再跑一次，会自动查找。')
+    return ''
   }
   const found = dshDirFromProcess() || dshDirsFromRegistry()[0] || dshDirsFromDrives()[0] || ''
   if (found) return found
