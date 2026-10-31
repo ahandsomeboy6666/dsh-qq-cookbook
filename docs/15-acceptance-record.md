@@ -1175,3 +1175,14 @@ set "NAPCAT_MAIN_PATH=%cd%\napcat.mjs"
 - [x] `cli check` → **16/16**
 
 **结论：陌生人路径（无 DSH → 装 DSH → 重跑）可验证。**
+
+### 2026-11-01 语音效果对齐（IndexTTS 2）
+
+- [x] 确认实际引擎：`gateway.mjs`（IndexTTS 2 本地），不是 `gateway-volc.mjs`（火山）
+- [x] 初始样本 vs 最近语音差异定位：响度（volume 2.5 → 1.0）、语速（duration_scale 0.9 → 1.1）、低频（bass +5）
+- [x] 指标对齐：F0 224.3（参考 223.7）、质心 1395（参考 1428）、低频差 -0.7dB
+- [x] 语音规则：basePersona 加【语音】段（情话/撒娇 → [语音]）
+- [x] 「只语音」逻辑回退（用户选择语音+补充文字）
+- [x] `cli check` → 16/16
+
+**遗留**：情话自动语音仍靠 prompt（不稳定），如需强制需代码层检测。

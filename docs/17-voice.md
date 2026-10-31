@@ -113,3 +113,16 @@ female-chengshu  成熟女性
 - 缓存按文本+音色哈希，同一句不重复合成
 - 音色文件在 `assets/voice-pack/*.mp3`，只用于面板试听
 - MiniMax 每句会先做一次「情境判断」拿语气指令，失败会降级成文字（`lastError` 里有原因）
+
+## IndexTTS 2 参数（2026-11-01 定稿）
+
+> 实际生效的网关是 `gateway.mjs`（IndexTTS 2），不是 `gateway-volc.mjs`（火山备用）。
+
+| 参数 | 值 | 作用 |
+|---|---|---|
+| `REF_AUDIO` | `ref-c4.wav` | 音色参考（v1） |
+| `volume` | 1.0 | 响度（曾 2.5，太响） |
+| `duration_scale` | 1.1 | 语速（曾 0.9，太快） |
+| `bass` | +5 @200Hz | 低频厚度（对齐初始样本） |
+
+改动位置：`E:\workspace\audio.cpp\gateway.mjs` 的 `FILTER` 和 `options`。
