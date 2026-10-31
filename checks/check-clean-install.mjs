@@ -67,12 +67,6 @@ try {
     env: { ...process.env, DSH_HOME: dshHome },
   });
   const out = String(r.stdout ?? '') + String(r.stderr ?? '');
-  if (r.status !== 0 || !out) {
-    console.log('[debug] spawn:', JSON.stringify({ status: r.status, signal: r.signal, error: r.error ? String(r.error.message) : null, stdoutLen: String(r.stdout ?? '').length, stderrLen: String(r.stderr ?? '').length }));
-    console.log('[debug] stdout:' + String(r.stdout ?? '').slice(0, 300));
-    console.log('[debug] stderr:' + String(r.stderr ?? '').slice(0, 500));
-    console.log('[debug] tmp kept at ' + tmp);
-  }
   const lines = out.split(/\r?\n/).filter((l) => /\[\w+\]/.test(l));
 
   const has = (re) => re.test(out);
