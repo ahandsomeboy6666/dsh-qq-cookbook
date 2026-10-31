@@ -644,6 +644,16 @@ index 83d8357..75ac99f 100644
      let agent=agents?.get?.(sessionId);if(!agent&&typeof ctx.sessionController.resolveAgent==='function'){const resolved=await ctx.sessionController.resolveAgent(sessionId);agent=resolved?.agent||agents?.get?.(sessionId);}
      if(agent&&typeof agents?.withInitiator==='function')return agents.withInitiator(agent,()=>host.search({query}));
      return host.search({query});
+diff --git a/media-sharing.js b/media-sharing.js
+index 64716c3..7db706a 100644
+--- a/media-sharing.js
++++ b/media-sharing.js
+@@ -24,4 +24,4 @@ export function reserveShare(config,ledger,{kind,key,personaId,topic='',idle=fal
+   ledger.log=[...ledger.log,item].slice(-40);return item;
+ }
+ export function finishShare(ledger,item,status,error=''){const found=ledger.log.find(e=>e.id===item?.id);if(found){found.status=status;if(error)found.error=String(error).slice(0,180);}}
+-export function explicitlyRequestsVoice(text=''){if(/(?:不要|别发|不用|不想听|不方便听).{0,8}(?:语音|声音)|(?:语音).{0,8}(?:开关|设置|接口|问题|失败)/.test(text))return false;return /(?:语音|发.{0,6}声音|用.{0,5}(?:声音|语音)|说给我听|念给我听|voice message|read aloud)/i.test(text);}
++export function explicitlyRequestsVoice(text=''){if(/(?:不要|别发|不用|不想听|不方便听).{0,8}(?:语音|声音)|(?:语音).{0,8}(?:开关|设置|接口|问题|失败)/.test(text))return false;return /(?:语音|发.{0,6}声音|用.{0,5}(?:声音|语音)|说给我听|念给我听|唱一下|唱一首|唱一个|点.{0,2}歌|来一首|voice message|read aloud)/i.test(text);}
 diff --git a/operation-context.js b/operation-context.js
 index 7181d04..d10059d 100644
 --- a/operation-context.js
