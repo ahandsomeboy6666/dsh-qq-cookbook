@@ -19,6 +19,7 @@ import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 
 import { existsSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import YAML from 'yaml'
 import { join, dirname, relative } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -630,60 +631,61 @@ let cordis = ''
 let cordisExisted = true
 try { cordis = await readFile(CORDIS, 'utf8') } catch { cordisExisted = false }
 if (!cordisExisted) {
-  await mkdir(dirname(CORDIS), { recursive: true })
+  if (!DRY) await mkdir(dirname(CORDIS), { recursive: true })
   cordis = ''
 }
 if (true) {
   const blocks = []
   if (!cordis.includes('id: im-bridge')) {
-    const groupLine = GROUP ? `    allowGroups: ['${GROUP}']` : '    allowGroups: []'
-    const napcatBlock = napcatDir
-      ? `    napcat:\n      dir: '${napcatDir.replaceAll('\\', '/')}'\n      launcher: '${(napcatLauncher || join(napcatDir, 'launcher-user.bat')).replaceAll('\\', '/')}'`
-      : '    # NapCat 还没装：装好后重跑本脚本会自动补上目录'
-    blocks.push(`
-# QQ 桥接：NapCat 目录 + 群聊唤醒（由 tools/setup.mjs 生成）
-- id: im-bridge
-  name: dsh-im-bridge
-  config:
-    wsUrl: '${defaults.wsUrl}'
-    accessToken: ''
-    allowUsers: ['${QQ}']
-${groupLine}
-    groupRequireAt: true
-    agentPreset: standard
-    presetRev: '1'
-    maxReplyChars: 1500
-${napcatBlock}
-    groupReplyAt: false
-    groupWake:
-      enabled: true
-      probability: ${defaults.groupWake.probability}
-      followMinutes: ${defaults.groupWake.followMinutes}
-      bufferSize: ${defaults.groupWake.bufferSize}
-      recentLimit: ${defaults.groupWake.recentLimit}
-      nicknames: [${defaults.groupWake.nicknames.map((n) => `'${n}'`).join(', ')}]
-`)
+    const entry = {
+      id: 'im-bridge',
+      name: 'dsh-im-bridge',
+      config: {
+        wsUrl: defaults.wsUrl,
+        accessToken: '',
+        allowUsers: [String(QQ)],
+        allowGroups: GROUP ? [String(GROUP)] : [],
+        maxReplyChars: 1500,
+        ...(napcatDir
+          ? {
+              napcat: {
+                dir: String(napcatDir).replaceAll('\\', '/'),
+                launcher: String(napcatLauncher || join(napcatDir, 'launcher-user.bat')).replaceAll('\\', '/'),
+              },
+            }
+          : {}),
+        groupReplyAt: false,
+        groupWake: {
+          enabled: true,
+          probability: defaults.groupWake.probability,
+          followMinutes: defaults.groupWake.followMinutes,
+          bufferSize: defaults.groupWake.bufferSize,
+          recentLimit: defaults.groupWake.recentLimit,
+          nicknames: defaults.groupWake.nicknames,
+        },
+      },
+    }
+    blocks.push('\n' + YAML.stringify([entry]))
   }
   if (!cordis.includes('id: mcp-browser')) {
     const nodeExe = process.execPath.replaceAll('\\', '/')
     const mcpCli = (process.env.PLAYWRIGHT_MCP_CLI ?? join(dirname(nodeExe), 'node_modules', '@playwright', 'mcp', 'cli.js')).replaceAll('\\', '/')
-    blocks.push(`
-# 浏览器能力：Playwright MCP（insert 才是新增条目）
-- insert:
-    - id: mcp-browser
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        serverName: browser
-        transport: stdio
-        command: '${nodeExe}'
-        args:
-          - '${mcpCli}'
-          - '--headless'
-        toolCallTimeoutMs: 60000
-        failOnStartupError: false
-`)
+    blocks.push('\n' + YAML.stringify([{
+      insert: [{
+        id: 'mcp-browser',
+        name: '@deepseek-ai/dsh-mcp-client',
+        config: {
+          serverName: 'browser',
+          transport: 'stdio',
+          command: nodeExe,
+          args: [mcpCli, '--headless'],
+          toolCallTimeoutMs: 60000,
+          failOnStartupError: false,
+        },
+      }],
+    }]))
   }
-  if (blocks.length === 0) {
+    if (blocks.length === 0) {
     step('写 cordis.patch.yml', 'SKIP', 'im-bridge 与 mcp-browser 都已存在')
   } else if (DRY) {
     step('写 cordis.patch.yml', 'TODO', `${blocks.length} 个条目`)
