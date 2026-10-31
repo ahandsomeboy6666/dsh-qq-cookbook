@@ -40,6 +40,11 @@ cd dsh-qq-cookbook
 node tools/setup.mjs      # 会问你 QQ 号 / 群号
 ```
 
+> **NapCat 的 QQ 从哪来**：`NapCat.Shell.zip` 只含 Shell 层，**不含 QQ.exe**。setup 补完 Shell 后会提示缺 QQ.exe，两种补法：
+>
+> 1. **OneKey 安装器（推荐）**：`node tools/setup.mjs --install-napcat`（或双击 `tools/napcat/NapCatInstaller.exe`），下载 QQ + Shell，约 300MB+
+> 2. **手动放 QQ**：把与 NapCat 补丁匹配的 QQ 解压到 `tools/napcat/<Shell 目录>/`。`napcat.quick.bat` 写死了 `%cd%\QQ.exe`，所以必须是**该目录下的 QQ.exe**；版本对不上会在 1 秒内崩（0x80000003）
+
 > **两种号别搞混**：`setup.mjs` 问的是**主人号**（白名单——谁能命令机器人）；
 > **NapCat 扫码用的是另一个小号**（机器人对外说话的身份）。脚本不碰扫码，也不会把主人号写进 NapCat。
 > 只有一个号的话，先去注册个小号——用主号当机器人有风控风险。
