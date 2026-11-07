@@ -31,3 +31,10 @@ config.local.json
 
 # ä»Žé›¶å®‰è£…æµ‹è¯•çš„ä¸´æ—¶ç›®å½•
 .tmp-clean-install-*/
+# ÉúÍ¼½Å±¾ÔËÐÐÊ±ÎÄ¼þ
+tools/auto-send.log
+tools/auto-send.err.log
+tools/.sent-images.json
+
+# Ò»´ÎÐÔ½Å±¾
+tools/set-h3-prompt.cjs
