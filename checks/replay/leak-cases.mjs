@@ -2,7 +2,14 @@
 // 覆盖用户点名的四类：无标题历史 JSON、英文运行时说明、混合正文、正常 JSON。
 //
 // 用法：node checks/replay/leak-cases.mjs
-import { stripInternalLeak, scanOutgoing, RULE_LEAK_LINES, OUTBOUND_RULES } from '../../vendor/dsh-im-bridge/outbound-clean.js';
+// 干净仓库（还没 clone 插件）没有这个模块：动态 import + exit 2（SKIP），
+// 让默认门禁在新机器上不会因为「插件还没装」而变红。
+const MOD = await import('../../vendor/dsh-im-bridge/outbound-clean.js').catch(() => null);
+if (!MOD) {
+  console.log('[SKIP] vendor/dsh-im-bridge/outbound-clean.js 不存在：先 clone 插件（或按补丁重建）再跑本检查');
+  process.exit(2);
+}
+const { stripInternalLeak, scanOutgoing, RULE_LEAK_LINES, OUTBOUND_RULES } = MOD;
 
 const CASES = [
   // —— 必须被拦下 ——

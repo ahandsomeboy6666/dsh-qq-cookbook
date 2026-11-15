@@ -44,6 +44,13 @@
 | [docs/21-config-layers.md](21-config-layers.md) | 配置分层：通用模板 vs 个人配置 | 已生效 |
 | [docs/22-song-training.md](22-song-training.md) | 唱歌训练：训练集来源、云端 GPU 步骤、模型回传 | 进行中 |
 | [docs/20-tts-selection.md](20-tts-selection.md) | **TTS 选型**：不接入/Edge/API/本地 Breeze 的效果与成本、AMD Vulkan 部署 | 已生效 |
+| [docs/23-local-ai-selection.md](23-local-ai-selection.md) | 本地 AI 能力选型：生图 / 音频 / 视频 | 参考 |
+| [docs/24-video-selection.md](24-video-selection.md) | 本地视频生成选型（2026-11） | 参考 |
+| [docs/25-prompt-optimizer.md](25-prompt-optimizer.md) | 提示词优化器：独立工具，按需使用 | 已生效 |
+| [docs/26-image-mechanism.md](26-image-mechanism.md) | 生图机制：私聊 / 群聊双轨 | 已生效 |
+| [docs/27-moss-seed-registry.md](27-moss-seed-registry.md) | MOSS 生图实测档案：seed 登记 + 能力边界 | 进行中 |
+| [docs/28-turn-boundary.md](28-turn-boundary.md) | 回合边界：插话/合并/作废与离线回放 | 已生效 |
+| [docs/persona-requirements.md](persona-requirements.md) | 人格偏好：用户否决记录 | 参考 |
 
 ## 决策记录（ADR）
 
