@@ -65,7 +65,16 @@ const CORDIS = join(PROFILE, 'cordis.patch.yml')
 const PACKAGE = join(PROFILE, 'package.json')
 const SETTINGS = join(DSH_HOME, 'im-bridge', 'settings.json')
 const VENDOR = join(ROOT, 'vendor', 'dsh-im-bridge')
-const PATCH = join(ROOT, 'patches', 'dsh-im-bridge-1.19.0-local.patch')
+// 通用补丁：从上游 03afb9c 可重建，只含已验收的私聊修复。
+// 旧 dsh-im-bridge-1.19.0-local.patch 的行为已全部被它覆盖（5 文件/36 hunks → 8 文件/47 hunks）。
+const PATCH = join(ROOT, 'patches', 'dsh-im-bridge-1.19.0-private-chat.patch')
+// 旧版补丁只用于「反向撤销」把已装旧版精确迁移到新版；不做任何工作区清理。
+const OLD_PATCH = join(ROOT, 'patches', 'dsh-im-bridge-1.19.0-local.patch')
+
+// 提前声明：summary() 在 profile 检查失败时（第 ~565 行）就会被调用，
+// 而 findNapcat() 要到第 ~696 行才跑。原来写成 let napcatDir = await … 会触发 TDZ，
+// 让「找不到 profile」这种正常失败变成崩溃。
+let napcatDir = ''
 
 const defaults = JSON.parse(await readFile(join(ROOT, 'config', 'defaults.json'), 'utf8'))
 let QQ = String(opt('--qq', defaults.qq ?? '')).trim()
@@ -610,16 +619,133 @@ if (!(await exists(VENDOR))) {
 }
 
 const indexFile = join(VENDOR, 'index.js')
+// 「已应用新版补丁」的判据必须用新版独有的东西。
+// normalizeGroupWake 在旧版 dsh-im-bridge-1.19.0-local.patch 里也有，
+// 用它判断会把「装了旧版」当成「已是最新」，升级路径直接断掉。
+// outbound-clean.js 只有新版才有（旧补丁 0 处引用），配合 index.js 的 import 一起校验。
+const cleanModuleFile = join(VENDOR, 'outbound-clean.js')
+const hasNewPatch = async () => {
+  if (!(await exists(cleanModuleFile))) return false
+  try {
+    const src = await readFile(indexFile, 'utf8')
+    return /from\s+['"]\.\/outbound-clean\.js['"]/.test(src) || /stripInternalLeak/.test(src)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 把补丁的 +/- 行数按文件统计出来，用来和 git diff --numstat 对照。
+ * 目的：区分「工作区的改动正好是旧补丁带来的」和「用户还手改了别的」。
+ */
+async function patchNumstat(patchPath) {
+  const text = await readFile(patchPath, 'utf8')
+  const stat = {}
+  let file = null
+  for (const ln of text.split('\n')) {
+    const m = /^\+\+\+ b\/(.+)$/.exec(ln)
+    if (m) { file = m[1]; stat[file] ??= { add: 0, del: 0 }; continue }
+    if (!file) continue
+    if (ln.startsWith('+') && !ln.startsWith('+++')) stat[file].add += 1
+    else if (ln.startsWith('-') && !ln.startsWith('---')) stat[file].del += 1
+  }
+  return stat
+}
+
+/** 当前工作区的改动统计（只看已跟踪文件） */
+function worktreeNumstat() {
+  const r = run('git', ['diff', '--numstat'], VENDOR)
+  const stat = {}
+  for (const ln of String(r.stdout || '').split('\n')) {
+    const m = /^(\d+)\s+(\d+)\s+(.+)$/.exec(ln.trim())
+    if (m) stat[m[3]] = { add: Number(m[1]), del: Number(m[2]) }
+  }
+  return stat
+}
+
+function sameStat(a, b) {
+  const ka = Object.keys(a)
+  const kb = Object.keys(b)
+  if (ka.length !== kb.length) return false
+  for (const k of ka) {
+    if (!b[k]) return false
+    if (a[k].add !== b[k].add || a[k].del !== b[k].del) return false
+  }
+  return true
+}
+
 if (await exists(indexFile)) {
   const code = await readFile(indexFile, 'utf8')
-  if (code.includes('normalizeGroupWake')) {
-    step('应用本地补丁', 'SKIP', '已有 normalizeGroupWake')
+  if (await hasNewPatch()) {
+    step('应用本地补丁', 'SKIP', '已是新版（outbound-clean.js 在位）')
   } else if (DRY) {
     step('应用本地补丁', 'TODO', relative(ROOT, PATCH))
   } else {
+    // ── 旧版 → 新版迁移 ──
+    // 原则：绝不清理工作区。normalizeGroupWake 只是「装过旧补丁」的线索，
+    // 不是可以拿来做 git checkout / git clean 的依据。
+    // 升级靠「反向应用旧补丁」精确撤销它带来的改动，其他任何修改都不碰。
+    const looksOld = code.includes('normalizeGroupWake')
+    let upgradedFromOld = false
+
+    if (looksOld) {
+      if (!(await exists(OLD_PATCH))) {
+        step('应用本地补丁', 'FAIL', `检测到旧版补丁，但缺少 ${relative(ROOT, OLD_PATCH)}，无法安全撤销`)
+        console.log('        保留 vendor 原样。可以手动 git apply -R 旧补丁后再重跑本脚本。')
+        summary(); process.exit(1)
+      }
+      // 先看有没有已跟踪改动/暂存改动。有就**先拒绝**，一个字都不动——
+      // normalizeGroupWake 只是线索，不能拿它当「可以清理」的依据。
+      const dirty = run('git', ['status', '--porcelain'], VENDOR)
+      const trackedDirty = String(dirty.stdout || '').split('\n').filter((l) => l && !l.startsWith('??'))
+      const staged = run('git', ['diff', '--cached', '--name-only'], VENDOR)
+      const hasStaged = String(staged.stdout || '').trim() !== ''
+
+      // 装了旧补丁的 vendor 必然有已跟踪改动（就是补丁本身），不能一看到就拒。
+      // 用行数统计判断：改动**恰好等于旧补丁**→ 纯旧版，可安全撤销；
+      // 还有别的改动 → 拒绝，一个字都不动。
+      const oldStat = await patchNumstat(OLD_PATCH)
+      const curStat = worktreeNumstat()
+      const onlyOldPatch = sameStat(curStat, oldStat)
+
+      if (hasStaged || !onlyOldPatch) {
+        step('应用本地补丁', 'FAIL', '旧版补丁 + 工作区有额外改动，为避免覆盖已停止（vendor 保持原样）')
+        if (trackedDirty.length) console.log('        已跟踪的改动：' + trackedDirty.slice(0, 5).map((x) => x.slice(3)).join('、'))
+        if (hasStaged) console.log('        另有已暂存改动，需先提交或 stash')
+        console.log('        处理建议：提交或备份这些改动后重跑；未跟踪文件不会被删除。')
+        summary(); process.exit(1)
+      }
+
+      const revert = run('git', ['apply', '-R', '--check', OLD_PATCH], VENDOR)
+      if (revert.status !== 0) {
+        step('应用本地补丁', 'FAIL', '旧版无法安全撤销（有冲突），vendor 保持原样')
+        console.log('        冲突详情：' + String(revert.stderr || '').trim().slice(0, 200))
+        console.log('        处理建议：手动 git apply -R ' + relative(ROOT, OLD_PATCH))
+        summary(); process.exit(1)
+      }
+      const reverted = run('git', ['apply', '-R', OLD_PATCH], VENDOR)
+      if (reverted.status !== 0) {
+        step('应用本地补丁', 'FAIL', '撤销旧补丁失败：' + String(reverted.stderr ?? '').slice(0, 160))
+        console.log('        vendor 可能处于中间状态，可用 git diff 检查，或从备份恢复。')
+        summary(); process.exit(1)
+      }
+      upgradedFromOld = true
+    }
+
     const check = run('git', ['apply', '--check', PATCH], VENDOR)
     if (check.status !== 0) {
-      step('应用本地补丁', 'FAIL', (check.stderr || '补丁与当前上游不兼容').trim().slice(0, 200))
+      // 原子性：新补丁打不上去时，把旧补丁装回去，vendor 回到升级前的样子。
+      if (upgradedFromOld) {
+        const back = run('git', ['apply', OLD_PATCH], VENDOR)
+        if (back.status === 0) {
+          step('应用本地补丁', 'FAIL', '新补丁无法应用，已把旧版装回，vendor 保持原状')
+        } else {
+          step('应用本地补丁', 'FAIL', '新补丁无法应用，且旧版回装失败，请从备份恢复 vendor')
+        }
+      } else {
+        step('应用本地补丁', 'FAIL', (check.stderr || '补丁与当前上游不兼容').trim().slice(0, 200))
+      }
+      console.log('        详情：' + String(check.stderr || '').trim().slice(0, 200))
       console.log('        补丁与上游版本不兼容：更新 patches/ 或回退 pluginBaseline')
       summary(); process.exit(1)
     }
@@ -628,10 +754,12 @@ if (await exists(indexFile)) {
       step('应用本地补丁', 'FAIL', 'git apply 执行失败：' + String(applied.stderr ?? '').slice(0, 160))
       summary(); process.exit(1)
     }
-    const patched = await readFile(indexFile, 'utf8')
-    if (!patched.includes('normalizeGroupWake')) {
-      step('应用本地补丁', 'FAIL', 'apply 成功但关键标记缺失（normalizeGroupWake）')
+    if (!(await hasNewPatch())) {
+      step('应用本地补丁', 'FAIL', 'apply 成功但新版标记缺失（outbound-clean.js 未生成或未被引用）')
       summary(); process.exit(1)
+    }
+    if (upgradedFromOld) {
+      console.log('        （已用 git apply -R 精确撤销旧补丁再安装新版；你的其他改动与未跟踪文件未受影响）')
     }
     const dirtyAfter = run('git', ['status', '--porcelain'], VENDOR)
     if (dirtyAfter.status === 0 && dirtyAfter.stdout.trim() === '') {
@@ -679,7 +807,7 @@ if (!pkg) {
 }
 
 /* 4. NapCat：检测（五个关键文件齐全才算装好）→ 下载 OneKey → 可选自动安装 */
-let napcatDir = await findNapcat()
+napcatDir = await findNapcat()   // 声明已提前到文件顶部（summary 可能更早调用）
 // 先查「目录在但不完整」——这个必须在 DRY 分支之前，
 // 否则 dry-run 只会说「去下载」，把真正的问题（缺 napcat.mjs）藏起来。
 const partialNapcat = napcatDir === '' ? (await napcatCandidates()).filter((d) => napcatMissing(d).length > 0) : []
@@ -714,6 +842,10 @@ if (napcatDir) {
   step('NapCat 本体', 'TODO', partialNapcat.length > 0
     ? '先修上面那个不完整目录（补全文件，或删掉重装）'
     : '下载 OneKey（约 1MB），--install-napcat 时自动装 QQ + NapCat（约 300MB）')
+} else if (process.argv.includes('--skip-napcat')) {
+  // 迁移/补丁测试不该被 NapCat 下载源拖累：下载 404 会让整个安装器 exit 1，
+  // 掩盖真正要验的补丁结果。测试时加 --skip-napcat。
+  step('下载 NapCat 安装包', 'SKIP', '--skip-napcat：跳过（不影响补丁与插件）')
 } else {
   try {
     const got = await downloadNapcatOneKey()

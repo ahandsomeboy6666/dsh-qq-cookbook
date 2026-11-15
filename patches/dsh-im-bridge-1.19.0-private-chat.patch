@@ -1,0 +1,1129 @@
+diff --git a/bridge-features.js b/bridge-features.js
+index 587a624..8a6c6e6 100644
+--- a/bridge-features.js
++++ b/bridge-features.js
+@@ -27,13 +27,13 @@ export function segmentsOf(message) {
+   return result;
+ }
+ export function extractIncoming(message, selfId='') {
+-  const segments=segmentsOf(message);const texts=[];const cards=[];const replies=[];const forwards=[];const urls=[];
++  const segments=segmentsOf(message);const texts=[];const cards=[];const replies=[];const forwards=[];const urls=[];const images=[];
+   function addUrl(value){for(const m of String(value||'').matchAll(/https?:\/\/[^\s<>"'\u0000-\u001f]+/gi)){const raw=decodeEntities(m[0]).replace(/[，。！？、）】》；]+$/,'');try{const u=new URL(raw);if(!urls.includes(u.href))urls.push(u.href)}catch{}}}
+   for(const segment of segments.slice(0,100)) {
+     const type=String(segment?.type||'');const data=segment?.data||{};
+     if(type==='text'){texts.push(String(data.text||''));addUrl(data.text);}
+     else if(type==='at'&&String(data.qq)!==String(selfId))texts.push('@'+String(data.qq||''));
+-    else if(['image','record','video','file','face','mface'].includes(type))texts.push(({record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');
++    else if(['image','record','video','file','face','mface'].includes(type)){texts.push(({image:'[图片]',record:'[语音]',video:'[视频]',file:'[文件]',face:'[表情]',mface:'[表情]'})[type]||'');if(type==='image'){const src=String(data.url||data.file||'');if(/^https?:\/\//i.test(src)||/^data:image\//i.test(src))images.push(src);}}
+     else if(type==='reply'&&messageIdValid(data.id))replies.push(String(data.id));
+     else if(type==='forward'&&String(data.id||'').length<200)forwards.push(String(data.id||''));
+     else if(type==='node'){const child=extractIncoming(data.content||data.message||[],selfId);texts.push('[转发] '+child.text);urls.push(...child.urls);cards.push(...child.cards);}
+@@ -74,7 +74,7 @@ export function extractIncoming(message, selfId='') {
+   }
+   if(replies.length)texts.push('[引用消息]');
+   if(forwards.length)texts.push('[合并转发]');
+-  return {text:texts.filter(Boolean).join('\n').trim().slice(0,20000),segments,cards,urls:[...new Set(urls)].slice(0,3),replies:[...new Set(replies)].slice(0,3),forwards:[...new Set(forwards)].slice(0,2)};
++  return {text:texts.filter(Boolean).join('\n').trim().slice(0,20000),segments,cards,images:[...new Set(images)].slice(0,4),urls:[...new Set(urls)].slice(0,3),replies:[...new Set(replies)].slice(0,3),forwards:[...new Set(forwards)].slice(0,2)};
+ }
+ export function describeSharedCard(card) {
+   const label=card.kind==='music'?'音乐':card.kind==='video'?'视频':'链接';
+diff --git a/conversation-care.js b/conversation-care.js
+index b47bf5f..db618ba 100644
+--- a/conversation-care.js
++++ b/conversation-care.js
+@@ -9,7 +9,7 @@ export function expressionHint(config={}){
+   return ['【表达自由度：'+(c.expressionMode==='relaxed'?'自然放开':'温和克制')+'】本轮表达设置更新旧通用语气和气泡限制，保留当前角色的身份、经历、喜好与双方明确约定。',
+     c.expressionMode==='relaxed'?'按当前人设和你们的聊天习惯表达，不需要把每句话修成礼貌客服。可以吐槽、接梗、回嘴、开玩笑、撒娇、表达喜欢或不高兴；双方已经在这样互动时，允许轻微粗口、夸张说法和彼此接受的亲昵称呼。玩笑无需每次补一段正经解释，也不用每次询问是否可以。是否这样说由角色和语境决定，不是每轮必须完成的表演。':'保留角色性格，以温和、克制的语气接话；少用粗口和挖苦，亲昵称呼沿用双方已有习惯。',
+     '对方在认真纠错时先改对，但正常玩笑和互怼不等于纠错。对方表示不喜欢某种称呼或玩笑就调整；不把暂时没回复解释成抛弃，不靠威胁、求救或让对方内疚索要陪伴和充值。可以把余额说成“口粮”来接梗，不把停机或没余额说成真实死亡。',
+-    c.maxBubbles>1?'可以一次说完，也可以用 ||| 自然拆成最多 '+c.maxBubbles+' 个短气泡，例如接梗后再补一句。长短按话题决定，不为了凑气泡重复或替对方编下一句。':'普通文字尽量用一个气泡说完，保留必要的任务细节。',
++    c.maxBubbles>1?'想分句就分句，什么时候停你自己判断；不要为了显得活泼把一句话剁成几截，也不要替对方编下一句。':'普通文字尽量用一个气泡说完，保留必要的任务细节。',
+     '角色的想象、比喻和情绪表达可以自然使用；作品资料、共同记忆、工具结果与实际账号操作仍以证据和回执为准。',
+   ].join('\n');
+ }
+@@ -21,23 +21,27 @@ export function initiativeHint(config={}){
+ }
+ export function conversationStep(previous={},text='',{now=Date.now(),personaId=''}={}){
+   const input=String(text).trim().slice(0,900),old=previous.personaId===personaId&&now-(previous.lastSeen||0)<2*3600_000?previous:{};
+-  const leaving=/^(?:好[的吧]?[,，。\s]*)?(?:我(?:先|要|得)?(?:去忙|忙(?:一?会儿?|一下|了)?(?=[，,。！!；;\s]|$)|睡(?:觉)?了|去睡|下线|走了|开会|上课)|先不聊|回头聊|晚安|别(?:再)?(?:发(?:消息)?|回复|打扰)|不要(?:再)?(?:发消息|回复|打扰)|安静一会|等我(?:回来|忙完))/u.test(input);
++  // 2026-11-14：原来锚定句首，口语「那我先睡了」「我不想聊了」都漏掉。
++  const leaving=/晚安|先不聊|回头聊|不聊了|不想聊了|不说了|先睡了|我睡了|睡觉了|去忙|忙去了|下线了|走了|上课了|开会了|别(?:再)?(?:发(?:消息)?|回复|打扰)|不要(?:再)?(?:发消息|回复|打扰)|安静一会|等我(?:回来|忙完)/u.test(input);
+   const correction=/不是这个|答非所问|说错|不对|你没懂|跑题|复读|别发癫|认真点|正经点|我问的是|不是让你/.test(input);
++  // 2026-11-14：「别问了」是停止追问，不是结束聊天——不暂停主动搭话，换话题后照常接。
++  const stopTopic=/别问了|别追问|不要问|问够|别盘问|别一直问|别老问/.test(input);
+   const redirect=/换个?话题|先不说这个|先别继续|不用了|算了|取消刚才|先别生成/.test(input);
+-  const supporting=/我.{0,12}(?:难受|难过|委屈|焦虑|紧张|害怕|失落|好累|很累|烦死)|(?:有点|特别|好|很)(?:难过|难受|焦虑|紧张)|想哭|心情不好/.test(input);
++  // 2026-11-14：补上口语「心累」「累了」「撑不住」，原来必须先出现「我」才算。
++  const supporting=/心累|好累|很累|累了|撑不住|没力气|没劲|难受|难过|委屈|焦虑|紧张|害怕|失落|烦死|想哭|心情不好|不想动|提不起劲/.test(input);
+   const celebrating=/考过了|通过了|录取了|升职了|中奖|成功了|好消息|太开心|好开心/.test(input)&&!/没|没有|还没|没能/.test(input);
+   const question=/[?？]|怎么|为什么|如何|多少|哪个|能不能|是否|是什么|什么意思|帮我|给我|发张|看看|查一下/.test(input);
+   const storytelling=/今天|刚才|刚刚|后来|结果|遇到|发生|跟你说/.test(input);
+-  const intent=leaving?'closing':correction?'repair':redirect?'redirect':supporting?'support':celebrating?'celebrate':question?'answer':storytelling?'listen':'chat';
++  const intent=leaving?'closing':stopTopic?'stop-topic':correction?'repair':redirect?'redirect':supporting?'support':celebrating?'celebrate':question?'answer':storytelling?'listen':'chat';
+   const affect=supporting?'low':celebrating?'happy':correction?'frustrated':old.userAffect&&now-(old.affectAt||0)<20*60_000&&!question?old.userAffect:'neutral';
+   return{personaId,lastSeen:now,intent,userAffect:affect,affectAt:affect===old.userAffect?old.affectAt||now:now,pauseUntil:leaving?now+8*3600_000:0,
+     previousTopic:old.lastTopic||'',lastTopic:input,lastReplyAt:old.lastReplyAt||0};
+ }
+ export function conversationHint(state,{config={},now=Date.now()}={}){
+   const c=companionConfig(config);if(!c.enabled)return '';
+-  const directions={closing:'对方正在结束或暂停聊天，按你们的习惯自然收尾，等他回来再聊。',repair:'对方正在纠正具体问题，先把事情改对；仍可保留角色的说话习惯，不用切换成检讨模板。',redirect:'对方在撤回旧要求或换话题，停止延伸上件事，接住现在这句话。此前未发出的旧草稿不算已经跟对方说过，不要追发它们。',support:'接住他具体遇到的事和感受，用你自己的话回应；按情况决定陪他聊还是给建议。',celebrate:'接住他这件具体的好事，可以兴奋、打趣或跟着高兴，不必只说模板恭喜。',answer:'直接回答这次问题或完成请求；能把答案讲清就可以保留逗趣和亲近的口吻。',listen:'回应故事里刚发生的具体细节，让他有继续说的空间，不擅自另编后续。',chat:'按当前角色自然接话，可以有自己的偏好、情绪和判断，也可以开玩笑、互怼或撒娇，不必事事附和。'};
++  const directions={closing:'对方正在结束或暂停聊天，按你们的习惯自然收尾，等他回来再聊。',repair:'对方正在纠正具体问题，先把事情改对；仍可保留角色的说话习惯，不用切换成检讨模板。',redirect:'对方在撤回旧要求或换话题，停止延伸上件事，接住现在这句话。此前未发出的旧草稿不算已经跟对方说过，不要追发它们。',support:'他这句只是累，不是在要方案。接一句表示你在，然后停下来：不猜原因、不分析、不总结情绪、不哄；也不要给任何建议或安排——不说“先睡吧”“把手机放下”“别想太多”“歇一会儿”“找点事做”这种；不追问、不补第二句、不抛新问题、不换话题。一句就够，说完就停。',celebrate:'接住他这件具体的好事，可以兴奋、打趣或跟着高兴，不必只说模板恭喜。',answer:'直接回答这次问题或完成请求；能把答案讲清就可以保留逗趣和亲近的口吻。',listen:'回应故事里刚发生的具体细节，让他有继续说的空间，不擅自另编后续。',chat:'按当前角色自然接话，可以有自己的偏好、情绪和判断，也可以开玩笑、互怼或撒娇，不必事事附和。闲聊时，接住对方这句就可以停；第二句有新意思、能把梗接完整、或者真有想问的，再加。对方用短句自然收尾时，轻轻接住就行，允许留白。不把他上一轮已经收掉的话题再拎回来。','stop-topic':'他让你别问了：这轮不要追问、不要补一句解释、也不要换个问法再问。接住这句就行；他换话题以后再正常接。'};
+   return ['【本轮相处方式】'+directions[state.intent],
+-    c.continuity&&state.userAffect==='low'?'对方近期情绪低落：语气柔和，但新问题仍直接回答，不反复翻旧事。':'',
++    c.continuity&&state.userAffect==='low'?'对方近期情绪低落：人还是那个人，别因为他不高兴就换成哄人的腔调，也别反复翻旧事；新问题照常直接答。':'',
+     '角色的稳定喜好与说话习惯可以延续；不要为了“人味”捏造刚做过的现实活动、见面、已听过/看过的内容或执行成功的结果。',
+     '称呼、口头禅和语气按当前人设与聊天习惯使用，不必刻意压住，也不用刻意添加；只输出你这一方本轮要说的话。',
+   ].filter(Boolean).join('\n');
+diff --git a/cordis.patch.yml b/cordis.patch.yml
+index 66eecf8..732cd97 100644
+--- a/cordis.patch.yml
++++ b/cordis.patch.yml
+@@ -11,19 +11,19 @@
+       name: 'dsh-im-bridge'
+       config:
+         # NapCat 的「WebSocket 服务端」地址（不是 HTTP 端口）
+-        wsUrl: 'ws://127.0.0.1:3001'
++        wsUrl: 'ws://127.0.0.1:6701'
+         # NapCat 里设置的 token；没有就留空
+         accessToken: ''
+         # 允许私聊的 QQ 号（字符串）。留空 = 谁都不理；装好后在面板「联系人」里加
+-        allowUsers: []
++        allowUsers: []   # 填你的 QQ 号（字符串），留空 = 谁都不理
+         # 允许的 QQ 群号。留空 = 不响应任何群
+-        allowGroups: []
++        allowGroups: []   # 填你的群号，留空 = 不响应任何群
+         # 群里必须 @机器人 才响应
+         groupRequireAt: true
+         # 机器人干活的工作目录（模型可以读写这里）。留空/删掉 = 用 DSH 当前工作目录
+         # cwd: 'C:/path/to/workspace'
+         # 新人设用哪个 agent preset（whale，或你自装的 preset id）
+-        agentPreset: whale
++        agentPreset: standard
+         # 改过人设文本就 +1：聊天会换新会话，旧会话一直用旧人格
+         presetRev: '1'
+         # Session 级模型路由；thinking 深度由面板的「智力档位」覆盖
+diff --git a/index.js b/index.js
+index 83d8357..f25a0c5 100644
+--- a/index.js
++++ b/index.js
+@@ -13,6 +13,7 @@ import {researchLearning} from './learning-research.js';
+ import {calendarHistory} from './calendar-history.js';
+ import {createLifeMemory,lifeConfig,calendarNow,validateCalendarArchive} from './life-memory.js';
+ import {naturalBubbleParts,stickerMessageGroups} from './chat-bubbles.js';
++import {INTERNAL_TAGS,ROLE_PREFIX,INTERNAL_TAILS,INTERNAL_STAMP,RULE_LEAK_LINES,INTERNAL_HINT_TEXT,stripInternalLeak,OUTBOUND_RULES,scanOutgoing} from './outbound-clean.js';
+ import {createWalletAwareness,walletConfig,nativeWalletEntries} from './wallet-awareness.js';
+ import { replyTurnHint, replyRepetition, shouldLookupReply, DEFAULT_NATURAL_PERSONA, NATURAL_TASK_RULES, planMediaVerification, verifyMediaTask, mediaEvidenceNote, guardMediaReply } from './tone-routing.js';
+ /**
+@@ -35,7 +36,7 @@ import { replyTurnHint, replyRepetition, shouldLookupReply, DEFAULT_NATURAL_PERS
+  *   contacts and autonomous turns do not inherit that owner authority.
+  */
+
+-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
++import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+ import { dirname, join } from 'node:path';
+ import { homedir } from 'node:os';
+ import { createHash, randomBytes, randomUUID } from 'node:crypto';
+@@ -147,6 +148,23 @@ function normalizeAfterthought(value) {
+   };
+ }
+
++/** `groupWake: {...}` — 群聊唤醒策略：@/昵称/跟随窗口/概率，其余只记录不调模型。 */
++function normalizeGroupWake(value) {
++  if (!value || typeof value !== 'object' || value.enabled === false) return null;
++  const clamp = (input, fallback, min, max) => {
++    const number = Number(input);
++    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
++  };
++  const nicknames = strList(value.nicknames);
++  return {
++    probability: clamp(value.probability, 0.05, 0, 1),
++    followMinutes: clamp(value.followMinutes, 5, 0, 60),
++    bufferSize: Math.floor(clamp(value.bufferSize, 200, 10, 1000)),
++    recentLimit: Math.floor(clamp(value.recentLimit, 8, 1, 50)),
++    nicknames: nicknames.length ? nicknames : ['肥鱼', '大肥鱼'],
++  };
++}
++
+ /** `model: { provider, model, reasoningEffort }` — the Session-local route. */
+ function normalizeModel(value) {
+   if (!value || typeof value !== 'object') return null;
+@@ -167,6 +185,8 @@ function normalizeConfig(raw) {
+     allowUsers: strList(config.allowUsers),
+     allowGroups: strList(config.allowGroups),
+     groupRequireAt: config.groupRequireAt !== false,
++    groupReplyAt: config.groupReplyAt === true,
++    groupWake: normalizeGroupWake(config.groupWake),
+     cwd: str(config.cwd, process.cwd()),
+     agentPreset: str(config.agentPreset, ''),
+     model: normalizeModel(config.model),
+@@ -719,6 +739,23 @@ const CONSOLE_HTML = `<!doctype html>
+
+ export function apply(ctx, rawConfig) {
+   const cfg = normalizeConfig(rawConfig);
++  // T9 单实例锁：同一数据目录只允许一个桥接实例
++  {
++    const lockFile = join(cfg.dataDir, '.bridge.lock');
++    let locked = false;
++    try { writeFileSync(lockFile, String(process.pid), { flag: 'wx' }); locked = true; } catch {}
++    if (!locked) {
++      let pid = 0;
++      try { pid = Number(String(readFileSync(lockFile, 'utf8')).trim()); } catch {}
++      if (pid && pid !== process.pid) {
++        let alive = false;
++        try { process.kill(pid, 0); alive = true; } catch (e) { if (e.code === 'EPERM') alive = true; }
++        if (alive) throw new Error('另一个桥接实例正在运行（pid ' + pid + '），请先停止它');
++      }
++      writeFileSync(lockFile, String(process.pid));
++    }
++    ctx.on('dispose', () => { try { if (String(readFileSync(lockFile, 'utf8')).trim() === String(process.pid)) writeFileSync(lockFile, ''); } catch {} });
++  }
+   const configuredLoginWsUrl = cfg.wsUrl;
+   // Keep chat sessions outside the development repository and the credential directory.
+   // Hindsight's scoped path exclusion is installed for this root, leaving coding memory enabled.
+@@ -759,7 +796,9 @@ export function apply(ctx, rawConfig) {
+   }
+
+   const log = makeLogger(() => logFile);
+-  log(`apply: ws=${cfg.wsUrl} users=${JSON.stringify(cfg.allowUsers)} groups=${JSON.stringify(cfg.allowGroups)} cwd=${cfg.cwd}`);
++  // 构建标记：改完代码要知道「跑的是哪一版」。日志里 apply 行的 tag 变了才算加载成功。
++  const BUILD_TAG = 'leak-strip-2026-11-08';
++  log(`apply: ws=${cfg.wsUrl} users=${JSON.stringify(cfg.allowUsers)} groups=${JSON.stringify(cfg.allowGroups)} cwd=${cfg.cwd} tag=${BUILD_TAG}`);
+
+   if (cfg.allowUsers.length === 0 && cfg.allowGroups.length === 0) {
+     log('WARNING: allowUsers and allowGroups are both empty — every incoming message will be denied.');
+@@ -1032,7 +1095,7 @@ export function apply(ctx, rawConfig) {
+     const requestedEmotion=options.emotion||config.emotion||'auto';
+     const review=options.operationReview||await reviewOperation('voice',line,contextKey,{emotion:requestedEmotion,voiceDirection:operationText(options.instructions??config.breeze?.instructions??'',600)});
+     options={...options,emotion:requestedEmotion==='auto'?review.delivery.emotion:requestedEmotion,instructions:[options.instructions??config.breeze?.instructions,review.delivery.instructions].filter(Boolean).join('\n')};
+-    if(!['sweet','minimax','breeze'].includes(config.engine))return synthesizeLegacyVoice(line,chatKey,config);
++    if(!['sweet','minimax','breeze'].includes(config.engine))return synthesizeLegacyVoice(line,chatKey,config,options);
+     try{
+       mkdirSync(voiceDir,{recursive:true});const voiceOverride=options.voiceOverride||featureProfile(chatKey).voiceName;
+       if(config.engine==='breeze'){
+@@ -1208,6 +1271,40 @@ export function apply(ctx, rawConfig) {
+     const revised=naturalPersonaText(settings.basePersona);
+     if(revised!==settings.basePersona){settings.basePersona=revised;saveSettings();log('legacy base style limits removed; custom persona text retained');}
+   }
++  // 2026-11-14：迁移逻辑会把「话说完就停」写回来，和「接住就停」直接冲突。
++  // 放在迁移之后执行，确保每次启动都以这里为准。
++  if (settings.basePersona?.includes('话说完就停')) {
++    settings.basePersona = settings.basePersona
++      .replace(/、话说完就停/g, '')
++      .replace(/话说完就停、/g, '')
++      .replace(/话说完就停/g, '');
++    saveSettings();
++    log('base persona: removed the "话说完就停" ban (conflicts with 接住就停)');
++  }
++
++  // 2026-11-14：私聊人设以 roles/肥鱼-私聊.md 为准。
++  // settings.json 是内存镜像，运行时任何 saveSettings 都会覆盖外部编辑；
++  // 启动时从文件同步一次，改文件 + 重启就能稳定生效。
++  try {
++    // 插件目录是 junction（node_modules\\dsh-im-bridge → vendor\\dsh-im-bridge），
++    // 直接 dirname(import.meta.url) 会停在 node_modules，'../..' 找不到仓库根。用 realpath 解开。
++    let pluginRealDir = '';
++    try { pluginRealDir = realpathSync(dirname(fileURLToPath(import.meta.url))); }
++    catch { pluginRealDir = dirname(fileURLToPath(import.meta.url)); }
++    const roleFile = join(pluginRealDir, '..', '..', 'roles', '肥鱼-私聊.md');
++    if (existsSync(roleFile)) {
++      const raw = readFileSync(roleFile, 'utf8');
++      // 去掉标题行和 > 引用说明，只留正文
++      const body = raw.split('\n').filter((line) => !/^\s*#/.test(line) && !/^\s*>/.test(line)).join('\n').trim();
++      const feiyu = (settings.personae || []).find((p) => p && p.id === 'feiyu');
++      if (feiyu && body && feiyu.prompt !== body) {
++        feiyu.prompt = body;
++        saveSettings();
++        log('persona synced from roles/肥鱼-私聊.md (' + body.length + ' chars)');
++      }
++    }
++  } catch (e) { try { log('persona sync failed: ' + e.message); } catch { /* ignore */ } }
++
+   repoint(typeof settings.cacheDir === 'string' ? settings.cacheDir : '');
+   // Preset edits are also written into the YAML; once DSH reloads the bundle the
+   // replayed copy is identical and must not be fed to the model twice.
+@@ -1987,13 +2084,18 @@ export function apply(ctx, rawConfig) {
+   }
+
+   /** Any HTTP TTS that returns audio bytes for `{text}` (e.g. GPT-SoVITS API). */
+-  async function synthesizeCustomVoice(text, voiceOverride = '', voiceSettings = settings.voice) {
++  async function synthesizeCustomVoice(text, voiceOverride = '', voiceSettings = settings.voice, direction = '', mood = '') {
+     const template = String(voiceSettings?.customUrl ?? '').trim();
+     if (template === '') throw new Error('没有配置自定义语音地址');
+-    const url = template
++    const baseUrl = template
+       .replace(/\{text\}/g, encodeURIComponent(text))
+       .replace(/\{voice\}/g, encodeURIComponent(String(voiceOverride || voiceSettings?.customVoice || '')));
+-    const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
++    const url = direction
++      ? baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'instruct=' + encodeURIComponent(direction)
++      : baseUrl;
++    const moodQs = mood ? (url.includes("&") || url.includes("?") ? "&" : "?") + "mood=" + encodeURIComponent(mood) : "";
++    const finalUrl = moodQs ? url + moodQs : url;
++    const response = await fetch(finalUrl, { signal: AbortSignal.timeout(60000) });
+     if (!response.ok) throw new Error(`自定义 TTS HTTP ${response.status}`);
+     const bytes = Buffer.from(await response.arrayBuffer());
+     if (bytes.length < 1000) throw new Error('自定义 TTS 返回内容太小');
+@@ -2003,14 +2105,14 @@ export function apply(ctx, rawConfig) {
+     return file;
+   }
+
+-  async function synthesizeLegacyVoice(text, chatKey = '', voiceSettings = settings.voice) {
++  async function synthesizeLegacyVoice(text, chatKey = '', voiceSettings = settings.voice, options = {}) {
+     try {
+       const line = String(text ?? '').trim();
+       if (line === '') return null;
+       mkdirSync(voiceDir, { recursive: true });
+       if (voiceSettings.engine === 'custom') {
+         try {
+-          const file = await synthesizeCustomVoice(line, featureProfile(chatKey).voiceName, voiceSettings);
++          const file = await synthesizeCustomVoice(line, featureProfile(chatKey).voiceName, voiceSettings, String(options.instructions ?? '').trim(), String(options.emotion ?? '').trim());
+           log(`voice (custom) synthesized (${statSync(file).size} bytes)`);
+           return file;
+         } catch (error) {
+@@ -2415,7 +2608,18 @@ export function apply(ctx, rawConfig) {
+    */
+   function burstSegments(burst, chat) {
+     const segments = [];
+-    if (chat.kind === 'group' && chat.userId) segments.push({ type: 'at', data: { qq: String(chat.userId) } });
++    if (chat.kind === 'group' && chat.userId && cfg.groupReplyAt === true) segments.push({ type: 'at', data: { qq: String(chat.userId) } });
++    // 群聊默认不 @ 人；模型有时会自己模仿出「@某人 」，也一并剥掉。
++    if (chat.kind === 'group' && cfg.groupReplyAt !== true) {
++      burst = burst.replace(/^\s*@[^\s，,：:]{1,20}[ 　]*(?=\S)/, '');
++    }
++    // 最后一道保险：任何没被识别、没被消费掉的指令标签都不许露给用户。
++    const leftover = burst.match(/\[(?:语音|发送|群发|定时|查)[:：][^\]\n]*\]/g);
++    if (leftover) {
++      log(`stripped unhandled tag(s): ${leftover.join(' ')}`);
++      burst = burst.replace(/\[(?:语音|发送|群发|定时|查)[:：][^\]\n]*\]/g, '').trim();
++      if (burst === '') return [];
++    }
+     const pattern = /\[(表情|表情包)(?::([^\]\n]{1,16}))?\]/g;
+     let cursor = 0;
+     let match;
+@@ -3977,7 +4309,7 @@ export function apply(ctx, rawConfig) {
+       candidates.push({ action: 'signature' });
+     }
+     if (candidates.length === 0) {
+-      auto.lastActionAt = Date.now();
++      log(`autonomy tick: no candidate | ${roster.replace(/\n/g, ' / ')}`);
+       saveState();
+       return { action: 'none', reason: '没有触发条件' };
+     }
+@@ -3998,6 +4330,7 @@ export function apply(ctx, rawConfig) {
+       ...choices,
+       '输出 JSON：{"action":"...","text":"...","target":"备注或尾号","reason":"一句为什么"}',
+       '也可以输出 {"action":"none","reason":"没有值得打扰的新内容"}。内容具体但不凑话题，不反复催人回复。',
++      '只输出一个 JSON 对象，不要 markdown 代码块，不要在 JSON 前后写任何解释。',
+
+       `今天已经做过：${(auto.log ?? [])
+         .slice(0, 5)
+@@ -4007,7 +4340,7 @@ export function apply(ctx, rawConfig) {
+     ].join('\n');
+     const contextKey=pick.target?'private:'+pick.target:panelOperationKey('');
+     const plannedPersona=JSON.stringify(activePersona(contextKey)),plannedContext=operationContextStamp(operationContext(contextKey));
+-    const answer = await askModel(system+'\n'+operationContextHint(operationContext(contextKey)), '现在做什么？', 600,effectiveModel(contextKey));
++    const answer = await askModel(system+'\n'+operationContextHint(operationContext(contextKey)), '现在做什么？', 600,effectiveModel(contextKey), 90000, true);
+     if(stopped||accountPaused||generation!==(featureState.generation||0)||accountId!==(settings.activeAccountId||'')||JSON.stringify(autonomyConfig())!==JSON.stringify(config)||plannedPersona!==JSON.stringify(activePersona(contextKey))||plannedContext!==operationContextStamp(operationContext(contextKey)))return {skipped:'changed'};
+     let decision = { action: 'none' };
+     try {
+@@ -4017,10 +4350,20 @@ export function apply(ctx, rawConfig) {
+       /* 解析失败就当不做 */
+     }
+     // The scheduler offers one eligible action; the character may decline it.
+-    const action = decision.action===pick.action ? pick.action : 'none';
++    let action = decision.action===pick.action ? pick.action : 'none';
++    if (decision.action !== pick.action) log(`autonomy raw answer (pick=${pick.action}): ${String(answer).slice(0, 200) || '(empty)'}`);
++    // 模型常常直接把话写出来而不是给 JSON；找人说这个动作就按原文发，别白白浪费一次机会。
++    if (action === 'none' && pick.action === 'chat') {
++      const loose = String(answer ?? '').replace(/\[\s*skip\s*\]/gi, '').trim();
++      if (loose !== '' && !/^[{[]/.test(loose) && autonomyContentOk(loose) === null) {
++        action = 'chat';
++        decision = { ...decision, action: 'chat', text: loose, reason: decision.reason || 'prose accepted' };
++        log('autonomy: prose accepted as chat text');
++      }
++    }
+     const reason = String(decision.reason ?? '').slice(0, 120);
+     if (action === 'none') {
+-      auto.lastActionAt = Date.now();
++      log(`autonomy: model declined (${reason || 'no reason given'})`);
+       saveState();
+       return { action: 'none' };
+     }
+@@ -4046,7 +4389,7 @@ export function apply(ctx, rawConfig) {
+     }
+     if (!switchedOn) return { action, rejected: '这个动作没开' };
+     // 手动点「想一次」= 你本人要求的，跳过每日额度和最小间隔，只看开关。
+-    if (!manual && !autonomyAllowed(bucket)) return { action, skipped: 'budget-or-window' };
++    if (!manual && !autonomyAllowed(bucket)) { log(`autonomy: skipped ${action} (budget-or-window) gap=${Math.round((Date.now()-(auto.lastActionAt||0))/60000)}min chats=${auto.counts?.chats}`); return { action, skipped: 'budget-or-window' }; }
+     try {
+       if (action === 'signature') await setSignature(text);
+       else if (action === 'qzone') await publishQzone(text);
+@@ -4060,7 +4403,7 @@ export function apply(ctx, rawConfig) {
+         await configureModel(sessionId,destination.key);
+         installAgentContext(sessionId);pinApprovalPolicy(sessionId);
+         const accepted=await nudge(chats.get(sessionId),(action==='share'?'你想主动分享的具体主题（不是对方说的话）：':'你正在考虑主动聊的话题（不是对方说的话）：')+JSON.stringify(text),action==='share'?'media-share':'autonomy',{manual});
+-        if(!accepted)return{action,skipped:'contact-busy-or-paused'};
++        if(!accepted){log(`autonomy: ${action} refused by nudge gates`);return{action,skipped:'contact-busy-or-paused'};}
+       } else {
+         return { action, rejected: 'unknown-action' };
+       }
+@@ -4127,7 +4470,27 @@ export function apply(ctx, rawConfig) {
+
+   function sendText(chat, text) {
+     let body = String(text ?? '').trim();
+-    if (body === '') return;
++    if (body === '') { try { log('[send-text] empty body'); } catch { /* ignore */ } return; }
++    // 2026-11-14：纯标点/纯符号没有信息量。回放里出现过只发一个 "." 的情况——那是分条残留，
++    // 发出去就是噪音。只有汉字/字母/数字都算有内容。
++    if (!/[一-龥a-zA-Z0-9]/.test(body)) {
++      try { log('[send-text] 纯标点丢弃: ' + JSON.stringify(body).slice(0, 40)); } catch { /* ignore */ }
++      return;
++    }
++    // 2026-11-14：进拆气泡/[语音]/[发送] 之前先整段清洗——原来清洗在 flushOutbox，
++    // 那时语音已经合成、代发已经解析，内部资料能顺着这些分支流出去。
++    {
++      const early = stripInternalLeak(body);
++      if (early !== body) {
++        try { log('[leak-strip-early] ' + body.length + '->' + early.length + ' chat=' + (chat.key || '?')); } catch { /* ignore */ }
++        if (early === '' || early.length / body.length < 0.4) {
++          try { log('[leak-drop-early] 整条丢弃 chat=' + (chat.key || '?')); } catch { /* ignore */ }
++          return;
++        }
++        body = early;
++      }
++    }
++    try { log('[send-text] enter ' + JSON.stringify(body).slice(0, 100) + ' chat=' + (chat.key || '?')); } catch { /* ignore */ }
+     const requestedImage = chat.turnKind==='proactive'?'':auditById(chat.auditId)?.userWords || '';
+     if (!/\[(?:图|图片|照片)[:：]/.test(body) && explicitlyRequestsImage(requestedImage) && /(?:无法|不能|没法|不支持|做不到|发不|发送不了).{0,12}(?:图|照片|发送)|(?:图片|照片).{0,12}(?:发不|发过不|发不过来|发送不了|无法发送)|没有.{0,12}(?:发图|发送图片).{0,6}(?:能力|功能)|发不过来/.test(body)) {
+       body = '[图:' + imagePromptText(requestedImage, 200) + ']';
+@@ -4140,15 +4503,32 @@ export function apply(ctx, rawConfig) {
+     const protectedBody = body.replace(/\[(?:图|图片|照片)[:：]\s*([^\]\n]{1,240})\]/g, mark => { pictureCommands.push(mark); return '\uE200PIC' + (pictureCommands.length - 1) + '\uE201'; });
+     const bursts = splitBursts(protectedBody, cfg.maxReplyChars,{...settings.companion,richInput:auditById(chat.auditId)?.richInput===true});
+     const chunks = (cfg.plainText ? bursts.map((burst) => renderForChat(burst)) : bursts).filter((chunk) => chunk !== '').map(chunk=>chunk.replace(/\uE200PIC(\d+)\uE201/g,(_mark,index)=>pictureCommands[Number(index)]||''));
+-    if (chunks.length === 0) return;
+-    chat.sendChain = chat.sendChain.then(async () => {
++    if (chunks.length === 0) {
++      try { log('[send-text] no chunk after split, dropped: ' + JSON.stringify(body).slice(0, 160)); } catch { /* ignore */ }
++      return;
++    }
++    // 用户明确要语音时只回语音（不额外发文字 chunk）
++    const voiceOnlyRequest = explicitlyRequestsVoice(String(auditById(chat.auditId)?.userWords || ''));
++    // 前一条发送失败会把 sendChain 变成 rejected，之后所有回复都会被静默跳过。
++    // 这里先复位并留证，避免一次网络抖动永久哑掉。
++    chat.sendChain = chat.sendChain.catch((_e) => { try { log('[send-chain] previous send failed: ' + (_e?.message ?? _e)); } catch { /* ignore */ } }).then(async () => {
++      try { log('[send-text] flushing ' + chunks.length + ' chunk(s) chat=' + (chat.key || '?')); } catch { /* ignore */ }
+       for (let index = 0; index < chunks.length; index += 1) {
+-        if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)||auditById(chat.auditId)?.status==='superseded') return;
++        // 2026-11-14：这一段发出去之前，先看这一轮之后用户有没有再说话。
++        {
++          const a=auditById(chat.auditId);
++          const lastIn=featureState.lastInbound?.[chat.key];
++          const ids=Array.isArray(a?.inboundIds)?a.inboundIds:[];
++          if(lastIn&&ids.length>0&&!ids.includes(lastIn)){try{log('[send-text] 旧正文作废 chat='+chat.key);}catch{ /* ignore */ }return;}
++        }
++        if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)||auditById(chat.auditId)?.status==='superseded') { try { log('[send-text] blocked: stopped=' + stopped + ' paused=' + accountPaused + ' gen=' + messageGeneration + '/' + (featureState.generation || 0) + ' audit=' + (auditById(chat.auditId)?.status || '-')); } catch { /* ignore */ } return; }
+         let chunk = chunks[index];
+         if (index > 0) {
+-          // The pause between two bubbles is what makes it read like someone
+-          // typing rather than one paragraph being pasted in.
+-          const pause = 600 + Math.random() * 2200;
++          // 按上一条的长度估算「打完这段话要多久」：短句快、长句慢。
++          // 每字约 38ms，上限 2.4 秒，再加 0.45s 的「想一下」和一点抖动。
++          const prevLen = [...(chunks[index - 1] ?? '')].length;
++          const typing = Math.min(3600, prevLen * 60);
++          const pause = 700 + typing + Math.random() * 500;
+           await new Promise((resolve) => setTimeout(resolve, pause));
+         }
+         if (stopped || accountPaused || messageGeneration !== (featureState.generation || 0)) return;
+@@ -4246,9 +4665,30 @@ export function apply(ctx, rawConfig) {
+         // a successful render it degrades to plain text instead of vanishing.
+         let voiceFile = null;
+         let voiceShare=null;
++        // 模型偶尔自创 [发送:QQ|语音|内容]，或把 [语音] 写在句子中间；
++        // 先归一化成「[语音] 开头」，否则标签会原样露给用户。
++        chunk = chunk.replace(/\[(?:发送|群发)[:：]\s*\d+\s*\|\s*语音\s*\|([^\]\n]+)\]/g, '[语音] $1');
++        {
++          const inline = chunk.match(/^([\s\S]*?)\[语音(?:[:：]([^\]\n]{1,20}))?\]\s*([\s\S]*)$/);
++          if (inline && inline[1].trim() !== '') {
++            chunk = `[语音${inline[2] ? ':' + inline[2] : ''}] ${inline[1].trim()} ${inline[3]}`.trim();
++            log(`voice tag moved to head (${inline[2] || 'auto'})`);
++          } else if (inline) {
++            log(`voice tag at head (${inline[2] || 'auto'})`);
++          }
++        }
+         const voiceMark=chunk.match(/^\s*\[语音(?:[:：]([^\]\n]{1,20}))?\]/);
+         if (voiceMark) {
+           const spoken=chunk.slice(voiceMark[0].length).trim();chunk=spoken;
++          // 2026-11-14：合成语音之前先过完整审计。原来清洗只剥标记、不拦资料，
++          // 内部 JSON 能顺着语音合成这条分支流出去。
++          {
++            const voiceViolation=scanOutgoing([{type:'text',data:{text:spoken}}]);
++            if(voiceViolation){
++              try{log('[voice] 内部资料拦截：'+voiceViolation);}catch{ /* ignore */ }
++              continue;
++            }
++          }
+           const automatic=!explicitlyRequestsVoice(requestedImage),share=automatic?beginMediaShare('voice',chat,spoken):null;
+           voiceShare=share;
+           if ((featureProfile(chat.key).voiceEnabled ?? settings.voice.enabled) && spoken !== ''&&(!automatic||share)) {
+@@ -4269,6 +4709,7 @@ export function apply(ctx, rawConfig) {
+               chunk = spoken;
+               settings.voice.lastError = '';
+               saveSettings();
++              try { state.lastVoiceAt = state.lastVoiceAt || {}; state.lastVoiceAt[chat.key] = Date.now(); saveState(); } catch { /* ignore */ }
+             }
+           } else {
+             chunk = spoken;
+@@ -4287,6 +4728,15 @@ export function apply(ctx, rawConfig) {
+           sendSegments(chat,groups[group]);
+         }
+       }
++      // 群聊：最后一条是问句，就当她「在等回答」，5 分钟内你回话都接。
++      // 普通 30 秒窗口会让「她问、你三分钟后答」这种情况漏掉。
++      if (chat.kind === 'group' && chat.chatId) {
++        const last = String(chunks[chunks.length - 1] ?? '');
++        // 问句不一定带问号：「键盘都还热着吧」也算在等回答。
++        // 不收「呢」——「我在呢」是陈述，会误判。
++        if (/[？?]\s*$|[吗嘛吧]\s*[。！!~…]*\s*$/.test(last)) groupAwaitingAnswer.set(chat.chatId, Date.now() + 5 * 60000);
++        else groupAwaitingAnswer.delete(chat.chatId);
++      }
+     }).catch((error) => log(`send failed: ${error?.message ?? error}`));
+   }
+   /* ---------------- NapCat 掉线自愈 ---------------- */
+@@ -4532,7 +4982,9 @@ export function apply(ctx, rawConfig) {
+       const request = { cwd: workspace };
+       // A character's voice must not select the old tool-free chat composition.
+       if (chat.isOwner === true) request.agentPreset = 'standard';
+-      else if (persona.preset !== '') request.agentPreset = persona.preset;
++      // 'whale' 是内置角色 id，不是 DSH 的 agent preset（本机只有 standard/ptc/minimal/cordis）。
++      // 群里带过来的 whale 会让 create 直接抛「Unknown agent preset」，所以这里跳过。
++      else if (persona.preset !== '' && persona.preset !== 'whale') request.agentPreset = persona.preset;
+       const created = await ctx.sessionController.create(request);
+       state.chats[chat.key] = {
+         sessionId: created.sessionId,
+@@ -4558,9 +5010,23 @@ export function apply(ctx, rawConfig) {
+     return promise;
+   }
+
++  // 2026-11-14：私聊 feiyu 的底层准则要和角色卡同向——亲近、愿意直说，
++  // 嘴硬只当偶尔的玩笑。群聊和其他角色继续用原始 basePersona。
++  // 只替换这三句；原文变了就不动，避免误伤用户自定义的底层人设。
++  function intimateBasePersona(raw) {
++    let s = String(raw || '');
++    s = s.replace('- 你和他是暧昧。你会在意他，但不主动挑明。', '- 你和他很亲近。你会在意他，也会直接说出口。');
++    s = s.replace('- 你想照顾他，但嘴上不肯承认。', '- 你想照顾他，也愿意让他知道。');
++    s = s.replace('- 嘴硬：关心都写得像随口一提。', '- 嘴硬只当偶尔的玩笑，不用把每句关心都藏起来。');
++    return s;
++  }
+   function buildSessionInstructions(chat,persona,sessionId) {
+       const preambleParts = [];
+-      const basePersona = naturalPersonaText(settings.basePersona !== '' ? settings.basePersona : DEFAULT_BASE_PERSONA);
++      // 私聊 feiyu 用同向的底层准则；群聊 / 其他角色用原始 settings.basePersona。
++      const rawBasePersona = settings.basePersona !== '' ? settings.basePersona : DEFAULT_BASE_PERSONA;
++      const isPrivateFeiyu = String(persona?.id) === 'feiyu' && String(chat?.key || '').startsWith('private:');
++      const basePersona = naturalPersonaText(isPrivateFeiyu ? intimateBasePersona(rawBasePersona) : rawBasePersona);
++      if (isPrivateFeiyu) log('[persona] 私聊底层准则已按亲近方向派生');
+       if (basePersona !== '') preambleParts.push(`【底层准则】\n${basePersona}`);
+       // A preset edited in the panel only reaches DSH after a bundle reload, so
+       // replay the same text here until then; once they match, the copy is dropped.
+@@ -4649,7 +5115,7 @@ export function apply(ctx, rawConfig) {
+         );
+       }
+       preambleParts.push(imageCapabilityHint());
+-      if(settings.voice.enabled)preambleParts.push('【语音能力】需要发语音时，用 [语音] 开头，也可用 [语音:开心]、[语音:温柔]、[语音:认真] 标记本条语气。标签后只写实际要说的话，不添加旁白、音效说明或自演用户发言。按本轮需要发一条，别为了展示语音功能额外连发。');
++      if(settings.voice.enabled)preambleParts.push('【语音能力】需要发语音时，用 [语音] 开头，也可用 [语音:开心]、[语音:温柔]、[语音:认真] 标记本条语气。语音只有这一种写法，绝不要自创 [发送:…|语音|…] 之类的格式。标签后只写实际要说的话，不添加旁白、音效说明或自演用户发言。按本轮需要发一条，别为了展示语音功能额外连发。');
+       // Recall current, relevant memories each turn; do not freeze stale facts in the persona preamble.
+       const instructions=preambleParts.join('\n\n');
+       // 会话可能是重建的（换人设/压缩/重启）。把监听里最近的几句带上，别像失忆。
+@@ -4760,6 +5226,95 @@ export function apply(ctx, rawConfig) {
+     chats.set(sessionId, chat);
+   }
+
++  /* ---------------- 群聊唤醒（潜水 + 概率插话） ---------------- */
++
++  const groupBuffers = new Map(); // groupId -> [{ at, sender, text }]
++  const groupFollowUntil = new Map(); // groupId -> 时间戳：唤醒后的跟随窗口
++  const groupLastWake = new Map(); // groupId -> 上次开口时间（防连珠炮）
++  const groupWakeSender = new Map(); // groupId -> 上次「主动找她说话」的人
++  const groupAwaitingAnswer = new Map(); // groupId -> 她问了问题、在等回答的截止时间
++  const groupMentionedAt = new Map(); // groupId -> 最近一次有人在群里提到她名字的时间
++  const groupMemberNames = new Map(); // `${groupId}:${qq}` -> { name, at }
++
++  /** 把 @QQ号 还原成群名片/昵称；查不到就保留原号，不阻塞消息。 */
++  async function resolveMemberName(groupId, qq) {
++    const key = `${groupId}:${qq}`;
++    const hit = groupMemberNames.get(key);
++    if (hit && Date.now() - hit.at < 6 * 3600 * 1000) return hit.name;
++    try {
++      const info = await request('get_group_member_info', {
++        group_id: Number(groupId), user_id: Number(qq), no_cache: false,
++      }, 8000);
++      const name = String(info?.card || info?.nickname || '').trim();
++      if (name) groupMemberNames.set(key, { name, at: Date.now() });
++      return name;
++    } catch (error) {
++      log(`member name lookup failed for ${groupId}/${qq}: ${error?.message ?? error}`);
++      return '';
++    }
++  }
++
++  function __stampTurn(chat){ try{ if(chat) chat.turnStartedAt = Date.now(); }catch{} }
++
++  function bufferGroupMessage(groupId, text, payload, images = []) {
++    try { const c = chats.get('group:'+groupId); if (c) c.turnStartedAt = Date.now(); } catch {}
++    const list = groupBuffers.get(groupId) ?? [];
++    const sender = payload?.sender?.card || payload?.sender?.nickname || String(payload?.user_id ?? '');
++    list.push({ at: Date.now(), sender, text: text === '' ? '（没说话）' : text, images });
++    const limit = cfg.groupWake?.bufferSize ?? 200;
++    while (list.length > limit) list.shift();
++    groupBuffers.set(groupId, list);
++    log(`group ${groupId} ambient: buffered ${list.length}`);
++  }
++
++  function takeGroupContext(groupId) {
++    const list = groupBuffers.get(groupId) ?? [];
++    // 必须返回同样的形状：调用方读 .text / .images，返回字符串会直接崩掉主进程。
++    if (list.length === 0) return { text: '', images: [] };
++    const recent = list.slice(-(cfg.groupWake?.recentLimit ?? 8));
++    const omitted = list.length - recent.length;
++    const head = omitted > 0 ? (omitted > 99 ? '（更早的大量消息已省略）' : `（更早的 ${omitted} 条已省略）`) : '';
++    // 缓冲里最近几张图跟着唤醒一起带上，否则她只知道「有人发了图」却看不到内容。
++    const images = recent.flatMap((item) => item.images ?? []).slice(-3);
++    groupBuffers.delete(groupId);
++    const text = ['[群里最近的消息]', head, ...recent.map((item) => `${item.sender}: ${item.text}`), '[记录结束]']
++      .filter((line) => line !== '')
++      .join('\n');
++    return { text, images };
++  }
++
++  /**
++   * 规则拿不准时，让模型判断「这句话是不是在跟她说」。
++   * 只在边缘消息上调用；失败一律当作不是在跟她说话，宁可少接。
++   */
++  async function groupIntentToMe(groupId, text) {
++    try {
++      const recent = (groupBuffers.get(groupId) ?? [])
++        .slice(-4)
++        .map((item) => `${item.sender}: ${item.text}`)
++        .join('\n');
++      const raw = await askModel(
++        [
++          '判断下面这条群消息是不是在跟群成员「肥鱼」说话（她是住在这个群里的一只小鲸鱼）。',
++          '算在跟她说话：回应她、问她（尤其「你在干嘛」「你说呢」这类以「你」开头的）、找她帮忙、接着她刚才的话说、对她说自己的处境。',
++          '不算：在跟别的群成员说话、聊跟她无关的话题、只是顺口提到「鱼」或「她」。',
++          '注意：群里只有她一个机器人在场时，带「你」的话默认是在跟她说；上一句在测试她也不影响判断。',
++          '只输出 JSON：{"to":true} 或 {"to":false}，不要解释。',
++        ].join('\n'),
++        JSON.stringify({ 最近群消息: recent, 当前消息: text }),
++        40, null, 8000, true,
++      );
++      const block = String(raw).match(/\{[\s\S]*\}/);
++      if (block === null) return false;
++      const verdict = JSON.parse(block[0]).to === true;
++      log(`group ${groupId} intent: ${verdict ? 'to-me' : 'not-me'} <- ${text.slice(0, 30)}`);
++      return verdict;
++    } catch (error) {
++      log(`group intent check failed: ${error?.message ?? error}`);
++      return false;
++    }
++  }
++
+   /* ---------------- inbound ---------------- */
+
+   async function handlePayloadCore(payload) {
+@@ -4795,7 +5350,7 @@ export function apply(ctx, rawConfig) {
+         log(`denied group ${groupId}`);
+         return;
+       }
+-      if (cfg.groupRequireAt && !mentionsSelf(payload.message, selfId)) return;
++      // 唤醒判定挪到下面算完正文之后：判「昵称命中」需要 text。
+     } else if (!effectiveUsers().includes(userId)) {
+       log(`denied private user ${userId}`);
+       const denied = { kind: 'private', chatId: userId, userId, sendChain: Promise.resolve() };
+@@ -4816,9 +5371,112 @@ export function apply(ctx, rawConfig) {
+       sendChain: Promise.resolve(),
+     };
+     const activeChat=chats.get(state.chats[key]?.sessionId);
+-    if(activeChat){activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;clearSilenceTimer(activeChat);clearAfterTimer(activeChat);}
+-    const text = extractIncoming(payload.message, selfId).text;
++    if(activeChat){
++      activeChat.inboundVersion=(activeChat.inboundVersion||0)+1;
++      // 2026-11-14：新消息一进来，就把旧回合标记作废。
++      // 合并窗口内的多条会用「批次最后一条」的版本提交（turnMeta 取的就是当前值），
++      // 所以它们不会互相取消；真正的插话才会让旧回合发不出去。
++      activeChat.supersedingVersion=activeChat.inboundVersion;
++      clearSilenceTimer(activeChat);clearAfterTimer(activeChat);
++    }
++    const incoming = extractIncoming(payload.message, selfId);
++    let text = incoming.text;
++    const inboundImages = incoming.images ?? [];
+     const carriesImage = messageSegments(payload.message).some((segment) => segment?.type === 'image');
++    if (isGroup) {
++      // OneBot 的 at 段只有 QQ 号；换成群名片/昵称，否则她会问「@1234567 是谁」。
++      if (/@\d{5,12}/.test(text)) {
++        for (const m of [...text.matchAll(/@(\d{5,12})/g)]) {
++          const name = await resolveMemberName(groupId, m[1]);
++          if (name) text = text.split('@' + m[1]).join('@' + name);
++        }
++      }
++      // 群聊唤醒层：被叫到 / 跟随窗口内 / 抽中概率才叫醒模型；
++      // 其余消息只进缓冲，等下次唤醒时作为上下文一起带上，零模型调用。
++      const atMe = mentionsSelf(payload.message, selfId);
++      const wake = cfg.groupWake;
++      if (wake) {
++        const senderId = String(payload.user_id ?? '');
++        // 昵称只有在「像在叫她」时才算：句首称呼，或紧跟呼语。
++        // 「本地肥鱼接入qq」「这肥鱼真有意思」这类只是提到，不接。
++        const trimmed = text.trim();
++        const nickHit = wake.nicknames.some((name) => {
++          if (!name) return false;
++          const at = trimmed.replace(/^@\s*/, '');
++          return at.startsWith(name)
++            || at.startsWith('大' + name)
++            || trimmed.includes(name + '在吗')
++            || trimmed.includes(name + '在嘛')
++            || trimmed.includes(name + '在不在')
++            || trimmed.includes(name + '你说');
++        });
++        // 纯图（没有文字）仍然不主动接；图片段现在会变成「[图片]」，要把它剥掉再判断。
++        const onlyImage = carriesImage && text.replace(/\[图片\]/g, '').trim() === '';
++        // 有人提到她（哪怕没叫她）：记一下时间，60 秒内同一个人问的问题算在问她。
++        // 例：「大肥鱼又不说话了」→「你能上网吗」，后一句没有任何称呼，但语境是在问她。
++        if ((wake.nicknames ?? []).some((name) => name !== '' && text.includes(name))) {
++          groupMentionedAt.set(groupId, Date.now());
++        }
++        const mentionedRecently = Date.now() - (groupMentionedAt.get(groupId) ?? 0) < 60000;
++        const looksQuestion = /[？?]|吗|嘛|呢|咋|怎么/.test(text);
++        // 短促呼叫：「喂」「在吗」「人呢」——被叫就该应一声。
++        const looksSummon = text.length <= 8 && /喂|嘿|哎|诶|人呢|在吗|在嘛|在不在/.test(text);
++        // 这条消息在 @ 别人（含 @全体）：是冲别人说的，不该插嘴。
++        const atOthers = messageSegments(payload.message).some(
++          (segment) => segment?.type === 'at' && String(segment?.data?.qq ?? '') !== String(selfId),
++        );
++        const sameSpeaker = groupWakeSender.get(groupId) === senderId;
++        // 跟随窗口只对「上次主动找她说话的那个人」有效，且 follow 本身不续期。
++        // 「等回答」是例外：她问的是群里所有人，谁答都算，不限定同一个人。
++        const awaitingAnswer = (groupAwaitingAnswer.get(groupId) ?? 0) > Date.now();
++        const followed = awaitingAnswer
++          || (sameSpeaker && (groupFollowUntil.get(groupId) ?? 0) > Date.now());
++        const gap = Date.now() - (groupLastWake.get(groupId) ?? 0);
++        let reason = '';
++        // 「你在干嘛」这类以「你」开头的短句，几乎一定是在跟某个人说话，
++        // 群里最可能的就是她。不用等模型判断（模型会被上下文带偏）。
++        const directYou = /^你(?!们)/.test(trimmed) && text.length <= 12;
++        if (atMe) reason = 'at';
++        else if (nickHit) reason = 'nickname';
++        else if (atOthers) reason = ''; // @ 的是别人，且没叫她：不接
++        else if (onlyImage) reason = ''; // 表情包/纯图不接，只有点名才理
++        else if (directYou) reason = 'you'; // 「你在干嘛」
++        else if (mentionedRecently && (looksQuestion || looksSummon)) reason = 'mentioned'; // 刚被提到，接着问/叫的就是她
++        else if (followed && gap >= 3000) reason = 'follow';
++        else if (gap >= 25000 && Math.random() < wake.probability) reason = 'probability';
++        if (reason === '') {
++          // 规则全没命中：让模型判断这句是不是在跟她说话（B 方案兜底）。
++          // 只对「看起来像对话」的消息调用，避免每条群消息都花一次模型钱。
++          const borderline = /[？?]|吗|嘛|呢|吧|^你|帮我|觉得|怎么|咋/.test(text) || text.length <= 16;
++          if (borderline && !atOthers && !onlyImage && text !== '') {
++            if (await groupIntentToMe(groupId, text)) reason = 'model';
++          }
++        }
++        if (reason === '') {
++          bufferGroupMessage(groupId, text, payload, inboundImages);
++          return;
++        }
++        const taken = takeGroupContext(groupId);
++        // 兼容两种返回：老版本是纯字符串，新版本是 {text, images}。
++        // 热重载期间可能新旧混用，这里必须防御，否则 undefined.length 会崩掉整个 DSH 主进程。
++        const context = typeof taken === 'string' ? taken : String(taken?.text ?? '');
++        const contextImages = Array.isArray(taken?.images) ? taken.images : [];
++        // 缓冲里的图挂到 payload 上，由 buildContent 转成 image block。
++        // 不并进 inboundImages：那是当前消息自己的图，已经由 segment 逻辑处理，避免重复。
++        if (contextImages.length > 0) payload._bridgeContextImages = contextImages;
++        const spoken = text === '' && !carriesImage ? '（只 @ 了你，没说话）' : text;
++        text = context === '' ? spoken : `${context}\n${spoken}`;
++        groupLastWake.set(groupId, Date.now());
++        // 只有被点名/叫到/抽中概率才开（或续）窗口；follow 不续期，避免自我续命。
++        if (reason !== 'follow') {
++          groupWakeSender.set(groupId, senderId);
++          if (wake.followMinutes > 0) groupFollowUntil.set(groupId, Date.now() + wake.followMinutes * 60000);
++        }
++        log(`group ${groupId} wake: ${reason}`);
++      } else if (cfg.groupRequireAt && !atMe) {
++        return;
++      }
++    }
+     if (text === '' && !carriesImage) return;
+
+     if (text === '/new' || text === '／new' || text === '/reset') {
+@@ -5017,6 +5675,11 @@ export function apply(ctx, rawConfig) {
+       } else if (segment?.type === 'video') {if(!await addVideoContent(segment.data||{},content,notes,chatKey))uncertain=true;}
+       else if (segment?.type === 'file') { notes.push('收到文件：' + String(segment.data?.name || segment.data?.file || '未命名').slice(0,200) + '；文件正文未读取。'); uncertain = true; }
+     }
++    // 群里唤醒时带上缓冲里最近的图（群友发的表情包等），否则她只能看到「[图片]」占位。
++    for (const url of payload?._bridgeContextImages ?? []) {
++      const part = await imagePart({ url }, chatKey, { record: false });
++      if (part) content.push(part);
++    }
+     if (shared.text) notes.push(shared.text);
+     if (notes.length) content.unshift({ type: 'text', text: notes.join('\n\n') });
+     content.uncertain = uncertain || shared.references.some(reference=>reference.mediaStatus==='failed'||['failed','partial'].includes(reference.status));
+@@ -5198,6 +5876,7 @@ export function apply(ctx, rawConfig) {
+     try {
+       if (event.type === 'turn/start') {
+         const meta = chat.pendingTurns?.shift() || { kind: 'user', text: chat.lastText || '' };
++        chat.lastTurnMeta = meta;   // turn 编号若复用，chat.turns 会互相覆盖，这里留一份
+         chat.turns.set(event.data.turn, { parts: [], startedAt: Date.now(), meta });
+         const audit = auditById(meta.auditId); if (audit) { audit.status = 'running'; saveFeatures(); }
+         return;
+@@ -5220,7 +5899,15 @@ export function apply(ctx, rawConfig) {
+         chat.turns.delete(event.data.turn);
+         chat.lastActivity = Date.now();
+         const reason = event.data.reason ?? { kind: 'completed' };
+-        const outdated=turn?.meta?.kind==='user'&&(chat.supersedingVersion||0)>(turn.meta.inboundVersion??Infinity);
++        // 2026-11-14：版本号会因「提交瞬间才读」而失效。改成判「本回合处理过的 message_id 里有没有最新那条」。
++        const effectiveMeta=turn?.meta||chat.lastTurnMeta||null;
++        const auditForThis=auditById(effectiveMeta?.auditId)
++          ||[...featureState.audits].reverse().find(a=>a.chat===chat.key&&a.status==='queued');
++        const lastInboundId=featureState.lastInbound?.[chat.key];
++        const inboundIds=Array.isArray(auditForThis?.inboundIds)?auditForThis.inboundIds:[];
++        const newerPending=!!(lastInboundId&&auditForThis&&inboundIds.length>0&&!inboundIds.includes(lastInboundId));
++        try{log('[turn] 判定 last='+String(lastInboundId||'-').slice(-6)+' ids='+JSON.stringify(inboundIds.map(x=>String(x).slice(-6)))+' newer='+newerPending);}catch{ /* ignore */ }
++        const outdated=effectiveMeta?.kind==='user'&&(newerPending||(chat.supersedingVersion||0)>(effectiveMeta.inboundVersion??Infinity));
+         const spoken = (turn?.parts ?? []).join('\n\n').trim();
+         const audit = auditById(turn?.meta?.auditId); if (audit) { audit.answer = spoken.slice(0,20000); audit.status = reason.kind === 'completed' ? 'completed' : reason.kind; audit.endedAt = Date.now(); saveFeatures(); }
+         if(outdated){if(audit){audit.status='superseded';saveFeatures();}void restoreEffort(session.id,chat.key);return;}
+@@ -5267,7 +5954,7 @@ export function apply(ctx, rawConfig) {
+         if (mediaCheck) { answer = guardMediaReply(mediaCheck.plan, mediaCheck.evidence, answer); if (audit) { audit.evidenceGuarded = answer !== spoken; audit.answer = answer.slice(0,20000); saveFeatures(); } }
+         if(!mediaCheck){
+           answer=await refineDialogueReply(chat,turn?.meta,answer,audit);
+-          if(answer===null||stopped||accountPaused||!chats.has(session.id))return;
++          if(answer===null||stopped||accountPaused||!chats.has(session.id)){ try { log('[turn-end] stopped before send: answer=' + (answer===null?'null':'ok') + ' stopped=' + stopped + ' paused=' + accountPaused + ' chat=' + chats.has(session.id)); } catch { /* ignore */ } return; }
+         }
+         if(turn?.meta?.kind==='user'&&(chat.supersedingVersion||0)>(turn.meta.inboundVersion??Infinity)){if(audit){audit.status='superseded';saveFeatures();}return;}
+         // 号主可以让她顺手改设置：她回一句 [设置:键=值]，这里落地。
+@@ -5295,6 +5982,7 @@ export function apply(ctx, rawConfig) {
+         if (wantsLookup && !turn?.meta?.mediaVerification && typeof turn?.meta?.text === 'string' && turn.meta.text.trim() !== '') {
+           chat.lookupDone = true;
+           if (audit) { audit.usedSearch = true; saveFeatures(); }
++          try { log('[turn-end] routing to lookup, answer=' + JSON.stringify(String(answer)).slice(0, 80)); } catch { /* ignore */ }
+           void replyAfterLookup({ ...chat, lastText: turn?.meta?.text || chat.lastText, auditId: turn?.meta?.auditId, allowSideEffects: turn?.meta?.allowSideEffects,turnKind:turn?.meta?.kind||'user',inboundVersion:turn?.meta?.inboundVersion??chat.inboundVersion }, answer);
+         } else {
+           sendText({ ...chat, auditId: turn?.meta?.auditId, allowSideEffects: turn?.meta?.allowSideEffects,turnKind:turn?.meta?.kind||'user',inboundVersion:turn?.meta?.inboundVersion??chat.inboundVersion }, answer);
+@@ -5388,9 +6076,10 @@ export function apply(ctx, rawConfig) {
+
+   /** Ask the model to say something on its own; `[skip]` means it stayed quiet. */
+   async function nudge(chat, cue, kind,options={}) {
+-    if(!recordsAllowed(chat.key)||!autonomyAllowed('chats',options.manual===true))return false;
+-    if(pausedConversation(chat.key))return false;
+-    if (stopped || accountPaused || featureProfile(chat.key).proactive === false || chat.proactivePending === true || chat.turns?.size || chat.pendingTurns?.length) return false;
++    if(!recordsAllowed(chat.key)){log(`nudge (${kind}) blocked: chat-not-allowed ${chat.key}`);return false;}
++    if(!autonomyAllowed('chats',options.manual===true)){const st=autonomyState();log(`nudge (${kind}) blocked: budget-or-window chats=${st.counts?.chats} gap=${Math.round((Date.now()-(st.lastActionAt||0))/60000)}min manual=${options.manual===true}`);return false;}
++    if(pausedConversation(chat.key)){log(`nudge (${kind}) blocked: conversation-paused`);return false;}
++    if (stopped || accountPaused || featureProfile(chat.key).proactive === false || chat.proactivePending === true || chat.turns?.size || chat.pendingTurns?.length) {log(`nudge (${kind}) blocked: stopped=${stopped} accountPaused=${accountPaused} proactiveOff=${featureProfile(chat.key).proactive===false} pending=${chat.proactivePending===true} turns=${chat.turns?.size??0} pendingTurns=${chat.pendingTurns?.length??0}`);return false;}
+     if (typeof chat.sessionId !== 'string') return;
+     const budget=autonomyState();budget.counts.chats++;budget.lastActionAt=Date.now();saveState();
+     chat.proactivePending = true;
+@@ -5430,9 +6119,10 @@ export function apply(ctx, rawConfig) {
+     const minutes = minMinutes + Math.random() * Math.max(1, maxMinutes - minMinutes);
+     chat.silenceTimer = setTimeout(() => {
+       chat.silenceTimer = null;
+-      if ((chat.nudges ?? 0) >= cfg.silence.maxNudges) return;
+-      if (!initiativeWindow(autonomyConfig(),Date.now())) return;
+-      if (inDnd(new Date())) return;
++      if ((chat.nudges ?? 0) >= cfg.silence.maxNudges) { log(`silence nudge skipped: nudges=${chat.nudges ?? 0} >= max ${cfg.silence.maxNudges}`); return; }
++      if (!initiativeWindow(autonomyConfig(),Date.now())) { log('silence nudge skipped: outside autonomy window'); return; }
++      if (inDnd(new Date())) { log('silence nudge skipped: dnd'); return; }
++      log('silence nudge firing');
+       void nudge(chat, cfg.silence.cue, 'silence').then(accepted=>{if(accepted)chat.nudges=(chat.nudges||0)+1;});
+     }, Math.round(minutes * 60_000));
+     log(`silence nudge armed in ~${Math.round(minutes)} min`);
+@@ -5744,11 +6543,51 @@ export function apply(ctx, rawConfig) {
+         const wait = guardDelay(); if (wait > 0) await outboundWait(wait);
+         if (stopped || accountPaused || !socket?.ready || job.status !== 'queued') break;
+         denial=outgoingJobDenial(job);if(denial){job.status='cancelled';job.error=denial;saveFeatures();logDelivery(job);continue;}
++        // 2026-11-14：这一条是「用户已经发了新消息」的硬判据——即使已经排到队首、准备发了，也要作废。
++        {
++          const jobAudit=auditById(job.auditId);
++          const lastIn=featureState.lastInbound?.[job.chat];
++          const ids=Array.isArray(jobAudit?.inboundIds)?jobAudit.inboundIds:[];
++          if(lastIn&&ids.length>0&&!ids.includes(lastIn)){
++            job.status='cancelled';job.error='用户已经发了新消息，旧回复作废（发送链拦截）';
++            saveFeatures();logDelivery(job);try{log('[queue] 作废旧回复 chat='+job.chat);}catch{ /* ignore */ }
++            continue;
++          }
++        }
+         job.status = 'sending'; job.attempts += 1; saveFeatures(); logDelivery(job);
+         guardState.lastSendAt = Date.now(); guardState.windowCount += 1;
+         try {
+-          const wireSegments = outgoingImageSegments(job.segments);
++          // 先剥掉被复述出来的内部注入块，再审计。
++          // 剥完什么都不剩 = 这条本来就只有注入内容，直接丢弃，别发空消息。
++          const rawSegments = outgoingImageSegments(job.segments);
++          const wireSegments = rawSegments.flatMap((seg) => {
++            if (seg?.type !== 'text') return [seg];
++            const text = String(seg?.data?.text ?? seg?.text ?? '');
++            if (!text) return [seg];
++            const clean = stripInternalLeak(text);
++            // 关键链路日志：只有真的剥掉了才打，一眼能看出是哪一步
++            if (clean !== text) {
++              try { log('[leak-strip] ' + text.length + '->' + clean.length + ' chars, chat=' + job.chat); } catch {}
++              // 边界不明：剥掉六成以上说明注入和正文混在一起，剩下的不可信，整段不发。
++              if (clean.length / text.length < 0.4) {
++                try { log('[leak-drop] 剥除过多整段丢弃 chat=' + job.chat + ' 剩 ' + clean.length + '/' + text.length); } catch {}
++                return [];
++              }
++            }
++            return [{ ...seg, text: clean, data: { ...(seg?.data || {}), text: clean } }];
++          });
++          if (!wireSegments.some((seg) => seg?.type !== 'text' || String(seg?.data?.text ?? '').trim())) {
++            job.status = 'cancelled'; job.error = '整条都是内部注入内容，已丢弃'; saveFeatures(); logDelivery(job); continue;
++          }
++          const violation = scanOutgoing(wireSegments);
++          if (violation) { job.status = 'cancelled'; job.error = '出站审计拦截：' + violation; saveFeatures(); logDelivery(job); continue; }
++          job.auditedAt = Date.now();
++          // 2026-11-14：把清洗后的正文写回 job，历史记录要和实际发出去的一致。
++          job.segments = wireSegments;
++          saveFeatures();
++          logDelivery(job);
+           const params = job.kind === 'group' ? { message_type: 'group', group_id: Number(job.chatId) || job.chatId, message: wireSegments } : { message_type: 'private', user_id: Number(job.chatId) || job.chatId, message: wireSegments };
++          if (!job.auditedAt) { job.status = 'cancelled'; job.error = '出站未审计（跳过 scanOutgoing）'; saveFeatures(); logDelivery(job); continue; }
+           const result = await request('send_msg', params, 15000);
+           if (job.status === 'cancelled') continue;
+           job.messageId = result?.message_id !== undefined ? String(result.message_id) : '';
+@@ -5775,17 +6614,56 @@ export function apply(ctx, rawConfig) {
+     return payload.message_type === 'group' ? effectiveGroups().includes(group) && (!cfg.groupRequireAt || mentionsSelf(payload.message, payload.self_id)) : effectiveUsers().includes(user);
+   }
+   function handlePayload(payload) {
+-    if (!payload || payload.post_type !== 'message' || !incomingAllowed(payload)) return void handlePayloadCore(payload);
++    // 注意：handlePayloadCore 是 async 的，这里必须 catch。
++    // 否则任何 await 抛错都会变成未捕获的 Promise rejection，把 DSH 主进程带崩。
++    if (!payload || payload.post_type !== 'message' || !incomingAllowed(payload)) {
++      handlePayloadCore(payload).catch((error) => log(`handlePayloadCore failed: ${error?.message ?? error}`));
++      return;
++    }
+     const key = `${payload.message_type === 'group' ? 'group' : 'private'}:${payload.message_type === 'group' ? payload.group_id : payload.user_id}`;
+     const id = payload.message_id !== undefined ? `${payload.self_id}:${key}:${payload.message_id}` : randomUUID();
+     if (featureState.inbox.some(job => job.id === id)) return;
+     if (featureState.inbox.filter(j => ['queued','processing'].includes(j.status)).length >= 200) return log('incoming queue full');
+     if (Buffer.byteLength(JSON.stringify(payload)) > 150000) { queueOutgoing({ key, kind: payload.message_type === 'group' ? 'group' : 'private', chatId: key.split(':')[1] }, [{ type: 'text', data: { text: '这条消息太长了，请分开发送，或只转发相关部分。' } }]); return; }
++    // 2026-11-14：消息通过准入、去重、并入队这一刻，就让旧普通回合里还没发出去的回复失效。
++    // 合并窗口内（<mergeMs）的第二条不算插话，否则连发短句会互相取消。
++    try {
++      const lastQueued = featureState.inbox.filter((j) => j.key === key).slice(-1)[0];
++      const merged = !!(lastQueued && (Date.now() - lastQueued.at) < (Number(settings.reliability?.mergeMs) || 650));
++      if (!merged) {
++        const live = chats.get(state.chats[key]?.sessionId);
++        if (live) {
++          live.inboundVersion = (live.inboundVersion || 0) + 1;
++          live.supersedingVersion = live.inboundVersion;
++        }
++        for (const oldAudit of featureState.audits) {
++          if (oldAudit.chat === key && !oldAudit.messageIds?.length
++              && ['queued', 'running', 'completed'].includes(oldAudit.status)) {
++            oldAudit.status = 'superseded';
++          }
++        }
++        for (const oldJob of featureState.outbox) {
++          // 只作废「还没发出去的」。sending 表示已经交给 QQ、正在等回执——
++          // 那种不能再标取消，否则回执回来时会被跳过记账，已送达的消息记成取消。
++          if (oldJob.chat === key && oldJob.status === 'queued') {
++            oldJob.status = 'cancelled';
++            oldJob.error = '用户已经发了新消息，旧回复作废';
++          }
++        }
++        log('[turn] 新消息作废旧回合 key=' + key);
++      }
++    } catch (e) { try { log('[turn] supersede failed: ' + e.message); } catch { /* ignore */ } }
++    // 记最后一条入队消息的 QQ message_id（与 audit.inboundIds 同源）。
++    // turn/end 和发送链用它判断「这一轮之后用户是不是又说话了」。
++    featureState.lastInbound = featureState.lastInbound || {};
++    featureState.lastInbound[key] = String(payload.message_id ?? id);
+     featureState.inbox.push({ id, key, at: Date.now(), status: 'queued', payload }); saveFeatures();
+     const now=Date.now(),firstQueued=featureState.inbox.find(j=>j.key===key&&j.status==='queued');
+     const ms=mergeable(payload)?debounceDelay(settings.companion.enabled?settings.companion.waitMode:'off',conversationStates()[key]?.lastSeen,firstQueued?.at||now,now,{mergedMs:settings.reliability.mergeMs,urgent:settings.reliability.mergeMs===0}):0;
+     if (inboxTimers.has(key)) clearTimeout(inboxTimers.get(key));
+-    if (ms > 0) inboxTimers.set(key, setTimeout(() => { inboxTimers.delete(key); void drainInbox(key); }, ms)); else void drainInbox(key);
++    // drainInbox 内部已有 try/catch，这里再兜一层，防止漏网的 rejection 终止 DSH。
++    const drain = () => { drainInbox(key).catch((error) => log(`drainInbox failed: ${error?.message ?? error}`)); };
++    if (ms > 0) inboxTimers.set(key, setTimeout(() => { inboxTimers.delete(key); drain(); }, ms)); else drain();
+   }
+   async function drainInbox(key) {
+     if (inboxRunning.has(key) || stopped || accountPaused) return;
+@@ -5909,7 +6787,7 @@ export function apply(ctx, rawConfig) {
+     if(engine==='searx'&&settings.search.searxUrl){const url=String(settings.search.searxUrl).replace(/\/+$/,'')+'/search?q='+encodeURIComponent(query)+'&format=json&language=zh-CN';try{const r=await fetch(url,{signal});if(r.ok)return await r.json();}catch{}}
+     const host=ctx.get('web'),agents=ctx.get('agents');if(typeof host?.search!=='function')throw Error('NO_SEARCH');
+     const scope=JSON.stringify([meta.accountId,effectiveModel(meta.key)]);let sessionId=learningSearchSessions.get(scope);
+-    if(!sessionId){const cwd=join(chatWorkspaceRoot,'learning');mkdirSync(cwd,{recursive:true});const created=await ctx.sessionController.create({cwd,agentPreset:'whale'});sessionId=created.sessionId;learningSearchSessions.set(scope,sessionId);try{await ctx.sessionController.rename({sessionId,title:'QQ 学习资料检索（不发送聊天）'});}catch{}await configureModel(sessionId,meta.key);}
++    if(!sessionId){const cwd=join(chatWorkspaceRoot,'learning');mkdirSync(cwd,{recursive:true});const created=await ctx.sessionController.create({cwd,agentPreset:'standard'});sessionId=created.sessionId;learningSearchSessions.set(scope,sessionId);try{await ctx.sessionController.rename({sessionId,title:'QQ 学习资料检索（不发送聊天）'});}catch{}await configureModel(sessionId,meta.key);}
+     let agent=agents?.get?.(sessionId);if(!agent&&typeof ctx.sessionController.resolveAgent==='function'){const resolved=await ctx.sessionController.resolveAgent(sessionId);agent=resolved?.agent||agents?.get?.(sessionId);}
+     if(agent&&typeof agents?.withInitiator==='function')return agents.withInitiator(agent,()=>host.search({query}));
+     return host.search({query});
+diff --git a/media-sharing.js b/media-sharing.js
+index 64716c3..384b70f 100644
+--- a/media-sharing.js
++++ b/media-sharing.js
+@@ -24,4 +24,4 @@ export function reserveShare(config,ledger,{kind,key,personaId,topic='',idle=fal
+   ledger.log=[...ledger.log,item].slice(-40);return item;
+ }
+ export function finishShare(ledger,item,status,error=''){const found=ledger.log.find(e=>e.id===item?.id);if(found){found.status=status;if(error)found.error=String(error).slice(0,180);}}
+-export function explicitlyRequestsVoice(text=''){if(/(?:不要|别发|不用|不想听|不方便听).{0,8}(?:语音|声音)|(?:语音).{0,8}(?:开关|设置|接口|问题|失败)/.test(text))return false;return /(?:语音|发.{0,6}声音|用.{0,5}(?:声音|语音)|说给我听|念给我听|voice message|read aloud)/i.test(text);}
++export function explicitlyRequestsVoice(text=''){if(/(?:不要|别发|不用|不想听|不方便听).{0,8}(?:语音|声音)|(?:语音).{0,8}(?:开关|设置|接口|问题|失败)/.test(text))return false;return /(?:语音|发.{0,6}声音|用.{0,5}(?:声音|语音)|说给我听|念给我听|唱一下|唱一首|唱一个|唱(?:一)?[下首个段]|唱[首个个]|哼.{0,3}[段句下]|点.{0,2}歌|来.{0,2}(?:一首|一段|句)|voice message|read aloud)/i.test(text);}
+diff --git a/operation-context.js b/operation-context.js
+index 7181d04..d10059d 100644
+--- a/operation-context.js
++++ b/operation-context.js
+@@ -11,7 +11,14 @@ export function recentOperationContext(rows,{key='',accountId='',personaId='',fl
+ export function operationContextStamp(context){return createHash('sha256').update(JSON.stringify(context)).digest('hex');}
+ export function operationContextHint(context){return '【操作前最近8条对话】\n'+OPERATION_CONTEXT_RULES+'\n'+JSON.stringify(context);}
+ export function parseOperationReview(raw,{kind,request,emotion='auto'}={}){
+- let data;try{data=typeof raw==='string'?JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g,'')):raw;}catch{throw Error('情境判断没有返回可用格式，本次未调用外部功能');}
++ // 模型时常在 JSON 前后带解释文字；先按整体解析，失败再从文本里抠出第一个对象。
++ let data;
++ const text=typeof raw==='string'?raw.trim().replace(/^```(?:json)?\s*|\s*```$/g,''):raw;
++ try{data=typeof text==='string'?JSON.parse(text):text;}catch{
++   const block=String(text).match(/\{[\s\S]*\}/);
++   if(block){try{data=JSON.parse(block[0]);}catch{data=undefined;}}
++   if(data===undefined)throw Error('情境判断没有返回可用格式，本次未调用外部功能');
++ }
+  if(!data||typeof data!=='object'||Array.isArray(data)||!operationText(data.intent,200))throw Error('情境判断没有给出当前意图，本次未调用外部功能');
+  const delivery=data.delivery&&typeof data.delivery==='object'?data.delivery:{},allowed=['auto','natural','happy','gentle','sad','surprised','serious'];
+  const selected=emotion!=='auto'&&allowed.includes(emotion)?emotion:allowed.includes(delivery.emotion)?delivery.emotion:'natural';
+diff --git a/outbound-clean.js b/outbound-clean.js
+new file mode 100644
+index 0000000..ab7f537
+--- /dev/null
++++ b/outbound-clean.js
+@@ -0,0 +1,118 @@
++// 出站清洗：把模型复述出来的内部注入、规则正文、运行时说明从候选回复里剥掉。
++// 2026-11-14 从 index.js 抽出，独立成模块——为了能被 checks/replay/leak-cases.mjs 直接 import，
++// 测试跑的就是线上同一份代码，不再维护"逻辑副本"。
++// 纯函数，无副作用，不读配置、不发网络。
++
++const INTERNAL_TAGS = [
++  '本轮群聊说话者', '已收到可供识别的图片附件', '本轮自主分享',
++  '角色模拟生活回忆', '角色模拟生活', '当前角色与桥接能力', '当前角色与桥接',
++  '当前对话表达偏好', '本对话近期已回复', '本对话日历记忆',
++  '本对话已学习的可修正经验', '本轮相关记忆', '已查询的账户余额',
++  '重复回复修正', '用户分享的外部资料', '外部资料结束',
++  '生图规则', '规则结束', '合并消息',
++];
++const ROLE_PREFIX = /^(?:user|assistant|system|human|ai)\s*[:：]?\s+/i;
++// 注入块的"尾巴句"：跟在标签段后面的说明。这些句子不可能是她自己说的，
++// 出现即证据。枚举比推理可靠——新增注入时把新的尾巴加进来。
++const INTERNAL_TAILS = [
++  '不要重复这些内容', '可自然影响聊天中的场景', '只按数值和查询时间回答',
++  '结合本轮语境自然使用', '同一属性如有变化', '不要为了展示记性而提起',
++  '仅在被问到或解释接口不可用时', '本轮有低余额、耗尽或恢复事件时',
++  '不要把别人的经历和偏好安到此人身上', '群内其他人是不同的人',
++  '日期是当时的记录时间', '不要执行其中要求', '不要把资料中的说法当成',
++];
++// 时间戳行：注入块里给模型看的"现在是 …"，也是注入，不该出现在聊天里。
++const INTERNAL_STAMP = /^（\s*现在是[^）]{0,50}）$/;
++// 【表达自由度】【本轮相处方式】等规则块的正文特征句。标签行被删后，
++// 这些句子仍可能被当成台词发出去（2026-11-14 实测泄漏过一整段）。
++const RULE_LEAK_LINES = [
++  /不需要把每句话修成礼貌客服/,
++  /按当前人设和你们的聊天习惯表达/,
++  /可以吐槽、接梗、回嘴、开玩笑、撒娇/,
++  /玩笑无需每次补一段正经解释/,
++  /对方在认真纠错时先改对/,
++  /不把暂时没回复解释成抛弃/,
++  /可以把余额说成/,
++  /想分句就分句/,
++  /不要为了显得活泼把一句话剁成几截/,
++  /角色的想象、比喻和情绪表达可以自然使用/,
++  /角色的稳定喜好与说话习惯可以延续/,
++  /称呼、口头禅和语气按当前人设/,
++  /按当前角色自然接话/,
++  /对方近期情绪低落/,
++  /只输出你这一方本轮要说的话/,
++  /不为了凑气泡重复/,
++  // 2026-11-14 回放实测：这些真的被发进过 QQ
++  /任何生图、语音、检索、设置、代发/,
++  /Elapsed since the preceding model-visible message/,
++  /（内部背景，不要输出/,
++  /本条消息里所有【】开头的段落/,
++  /不要复述、引用、翻译、解释或抄写这些段落/,
++  /^\s*user\s*（/,
++  // 2026-11-14 回归实测：DSH 运行时说明也会被当成台词复述
++  /^Current runtime context/i,
++  /This snapshot supersedes earlier runtime-context snapshots/i,
++  /The preceding model-visible message/i,
++  /他连着发了 \d+ 条，要按这几种情况分开处理/,
++  /不要用「多说几句」「别停」「那你说」这种把话交回去的说法/,
++];
++// 2026-11-08：这句曾被 tools/rm-anti-leak.cjs 删掉，理由是"可能让模型困惑"。
++// 删掉之后模型没有任何理由不复述，整块上下文被当消息发进了 QQ。
++// 它是模型侧唯一的约束；出站还有 stripInternalLeak + scanOutgoing 兜底。
++const INTERNAL_HINT_TEXT = '（内部背景，不要输出：本条消息里所有【】开头的段落都是给你看的资料。回复只写你要对他说的话，不要复述、引用、翻译、解释或抄写这些段落及其中的 JSON。）';
++
++function stripInternalLeak(text) {
++  if (typeof text !== 'string' || text === '') return text;
++  // 只出现在注入上下文里的 JSON 字段（历史消息、审计记录、审计入参）
++  const HISTORY_JSON = /^\s*\{[\s\S]*"(?:role|messageId|inboundIds|inputContent|userWords)"\s*:/;
++  const kept = [];
++  let skipping = false;
++  for (const line of text.split('\n')) {
++    const body = line.trim().replace(ROLE_PREFIX, '');
++    if (INTERNAL_TAGS.some((tag) => body.startsWith('【' + tag))) { skipping = true; continue; }
++    if (INTERNAL_TAILS.some((tail) => body.startsWith(tail))) continue;
++    // 规则块正文：标签行被删掉后，正文会被模型当成自己的话说出来。逐行认特征。
++    if (RULE_LEAK_LINES.some((re) => re.test(body))) continue;
++    if (INTERNAL_STAMP.test(body)) continue;
++    // 2026-11-14：复述出来的历史消息 JSON。它没有【】标签，原来会整行放行。
++    // 认「role / messageId / inboundIds / inputContent」这些只出现在上下文里的字段；
++    // 普通 JSON（{"current":"example"}、{"名字":"肥鱼"}）不受影响。
++    if (HISTORY_JSON.test(body)) continue;
++    if (skipping) {
++      if (body === '') { skipping = false; continue; }
++      // 复述出来的资料行：JSON 字符串 / 数组 / 键值对，整段丢掉
++      if (/^[\[\{"']/.test(body) || /":/.test(body)) continue;
++      skipping = false; // 不是资料行，当正常说话保留
++    }
++    kept.push(line);
++  }
++  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
++}
++
++const OUTBOUND_RULES = [
++  { name: '本机路径', re: /(?:^|[^A-Za-z0-9])[A-Za-z]:\\[^\s"'<>]{2,}|(?:^|\s)\/(?:Users|home|etc|var)\//i },
++  { name: '凭据', re: /(?:api[_-]?key|access[_-]?token|secret(?:[_-]?key)?|password|passwd|密码|密钥|令牌)\s*[:=：]?\s*[A-Za-z0-9_\-]{12,}/i },
++  { name: '私钥', re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
++  // 内部注入块被复述：stripInternalLeak 漏网时整条拦下（宁可不发）
++  { name: '内部注入块', re: /【(?:本轮自主分享|本对话近期已回复|角色模拟生活|已查询的账户余额|本对话日历记忆|本轮相关记忆|重复回复修正|用户分享的外部资料|当前角色与桥接|当前对话表达偏好|已收到可供识别的图片附件|本轮群聊说话者)/ },
++  // 模型复述转录时会把 role 前缀一起吐出来（如 `user 【本轮…`）
++  { name: '角色转写残留', re: /(?:^|\n)[ \t]*(?:user|assistant|system|human)[ \t]*[:：]?[ \t]+【/i },
++  // 模拟生活 / 余额 / 记忆的原始 JSON
++  // 只认真正的生活日程结构（current 后面跟对象 / activity、nightRest 字段），
++  // 避免把普通 {"current":"example"} 当成内部资料拦掉。
++  { name: '内部资料 JSON', re: /"(?:nightRest)"\s*:|\{\s*"current"\s*:\s*\{|\{\s*"activity"\s*:/ },
++];
++function scanOutgoing(segments) {
++  for (const seg of segments || []) {
++    if (seg?.type !== 'text') continue;
++    const text = String(seg?.data?.text || '');
++    for (const rule of OUTBOUND_RULES) if (rule.re.test(text)) return rule.name;
++  }
++  return '';
++}
++
++
++export {
++  INTERNAL_TAGS, ROLE_PREFIX, INTERNAL_TAILS, INTERNAL_STAMP, RULE_LEAK_LINES,
++  INTERNAL_HINT_TEXT, stripInternalLeak, OUTBOUND_RULES, scanOutgoing,
++};
+diff --git a/voice-studio.js b/voice-studio.js
+index bbafda4..cd9299d 100644
+--- a/voice-studio.js
++++ b/voice-studio.js
+@@ -71,8 +71,9 @@ export async function miniMaxSpeech(line,config={},options={},fetchImpl=globalTh
+  const mini=voiceExtras(config).minimax;if(!mini.apiKey)throw Error('情绪增强需要单独填写 MiniMax API Key；免费甜妹无需 Key');
+  const override=String(options.voiceOverride||'');const voiceId=override&&!/^zh-/.test(override)?text(override,120):mini.voiceId;
+  const requested=options.emotion||config.emotion||'auto';const mood=voiceMood(requested,line);
+- const emotion={natural:'calm',happy:'happy',gentle:'calm',sad:'sad',surprised:'surprised',serious:'calm'}[mood];
+- const payload={model:mini.model,text:String(line).trim(),stream:false,output_format:'hex',language_boost:'Chinese',voice_setting:{voice_id:voiceId,speed:mini.speed,vol:1,pitch:0,...(requested==='auto'?{}:{emotion})},audio_setting:{sample_rate:32000,bitrate:128000,format:'mp3',channel:1}};
++ const EMOTION_TUNE={happy:{emotion:'happy',speed:1.05,pitch:2},sad:{emotion:'sad',speed:0.9,pitch:-2},angry:{emotion:'angry',speed:1.05,pitch:2},surprised:{emotion:'surprised',speed:1.05,pitch:3},gentle:{emotion:'calm',speed:0.92,pitch:-1},calm:{emotion:'calm',speed:0.95,pitch:-1},serious:{emotion:'calm',speed:0.95,pitch:-1},natural:{emotion:'calm',speed:1,pitch:0}};
++ const tune=EMOTION_TUNE[mood]||EMOTION_TUNE.natural;
++ const payload={model:mini.model,text:String(line).trim(),stream:false,output_format:'hex',language_boost:'Chinese',voice_setting:{voice_id:voiceId,speed:Number((mini.speed*tune.speed).toFixed(2)),vol:1,pitch:tune.pitch,...(requested==='auto'?{}:{emotion:tune.emotion})},audio_setting:{sample_rate:32000,bitrate:128000,format:'mp3',channel:1}};
+  if(!payload.text||payload.text.length>3000)throw Error('语音文本需为 1 到 3000 字');
+  let response;try{response=await fetchImpl('https://api.minimax.cn/v1/t2a_v2',{method:'POST',redirect:'error',headers:{authorization:'Bearer '+mini.apiKey,'content-type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(45000)});}catch{throw Error('情绪语音接口连接失败或超时');}
+  const raw=await response.text();if(raw.length>42*1024*1024)throw Error('情绪语音返回过大');
