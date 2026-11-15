@@ -16,7 +16,7 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync, readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync, statSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
@@ -674,6 +674,43 @@ function sameStat(a, b) {
   return true
 }
 
+/**
+ * 迁移演练：在临时 git worktree 里跑完整的「撤旧 → 装新 → 语法检查」。
+ * 全程不碰正式 vendor，所以任何一步失败都不会影响现有安装。
+ */
+async function rehearseMigration() {
+  const tmp = mkdtempSync(join(tmpdir(), 'bridge-migrate-'))
+  const cleanup = () => {
+    try { run('git', ['worktree', 'remove', '--force', tmp], VENDOR) } catch { /* ignore */ }
+    try { rmSync(tmp, { recursive: true, force: true }) } catch { /* ignore */ }
+  }
+  try {
+    const add = run('git', ['worktree', 'add', '--detach', tmp, 'HEAD'], VENDOR)
+    if (add.status !== 0) return { ok: false, why: '无法创建临时工作树：' + String(add.stderr || '').trim().slice(0, 160) }
+
+    // 临时工作树是 HEAD（上游干净状态），正好等于「撤掉旧补丁之后的 vendor」。
+    // 所以这里只需要验证新补丁能否干净地应用上去，再跑一次语法检查。
+    const b = run('git', ['apply', PATCH], tmp)
+    if (b.status !== 0) return { ok: false, why: '新补丁无法应用到上游状态：' + String(b.stderr || '').trim().slice(0, 160) }
+
+    if (!existsSync(join(tmp, 'outbound-clean.js'))) {
+      return { ok: false, why: '临时副本里没有 outbound-clean.js（新补丁未完整生成）' }
+    }
+    const idx = await readFile(join(tmp, 'index.js'), 'utf8')
+    if (!/outbound-clean\.js/.test(idx)) {
+      return { ok: false, why: '临时副本里 index.js 没有引用 outbound-clean.js' }
+    }
+    const chk = run(process.execPath, ['--check', join(tmp, 'index.js')], tmp)
+    if (chk.status !== 0) return { ok: false, why: '临时副本语法检查失败：' + String(chk.stderr || '').trim().slice(0, 160) }
+
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, why: String(error?.message ?? error).slice(0, 160) }
+  } finally {
+    cleanup()
+  }
+}
+
 if (await exists(indexFile)) {
   const code = await readFile(indexFile, 'utf8')
   if (await hasNewPatch()) {
@@ -723,9 +760,23 @@ if (await exists(indexFile)) {
         console.log('        处理建议：手动 git apply -R ' + relative(ROOT, OLD_PATCH))
         summary(); process.exit(1)
       }
+
+      // ── 事务性演练 ──
+      // 先在临时工作树里完整走一遍「撤旧补丁 → 应用新补丁 → 语法检查」。
+      // 只有这一整套都成功，才去动正式目录。
+      // 这样即使出现「--check 过了但 git apply 实际失败」，正式目录也还没被碰过，
+      // 旧版安装完整保留。
+      const rehearsal = await rehearseMigration()
+      if (!rehearsal.ok) {
+        step('应用本地补丁', 'FAIL', '迁移演练未通过，vendor 保持旧版原样（未做任何修改）')
+        console.log('        原因：' + rehearsal.why)
+        console.log('        处理建议：检查 patches/ 下两个补丁是否匹配当前上游；vendor 未被改动。')
+        summary(); process.exit(1)
+      }
+
       const reverted = run('git', ['apply', '-R', OLD_PATCH], VENDOR)
       if (reverted.status !== 0) {
-        step('应用本地补丁', 'FAIL', '撤销旧补丁失败：' + String(reverted.stderr ?? '').slice(0, 160))
+        step('应用本地补丁', 'FAIL', '撤销旧补丁失败（演练已通过，属意外）：' + String(reverted.stderr ?? '').slice(0, 160))
         console.log('        vendor 可能处于中间状态，可用 git diff 检查，或从备份恢复。')
         summary(); process.exit(1)
       }
