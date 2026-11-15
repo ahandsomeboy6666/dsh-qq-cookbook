@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve('.');
@@ -219,6 +220,50 @@ const results = [];
   });
 }
 
+// ── 7 新版已写入、随后校验失败 → 必须完整退回旧版（不许新旧混装）──
+{
+  const { dir, vend } = makeRepo('7');
+  sh('git', ['apply', OLD_PATCH], vend);
+
+  // 快照范围要和 setup 一致：新旧补丁涉及文件的并集
+  const filesOf = (patchPath) => [...new Set(
+    [...fs.readFileSync(patchPath, 'utf8').matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1]),
+  )];
+  const scope = [...new Set([...filesOf(OLD_PATCH), ...filesOf(NEW_PATCH)])];
+
+  const capture = () => {
+    const state = {};
+    for (const f of scope) {
+      const p = path.join(vend, f);
+      state[f] = fs.existsSync(p)
+        ? 'present:' + crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 16)
+        : 'absent';
+    }
+    const gs = sh('git', ['status', '--porcelain'], vend).out.trim();
+    return { state, gs };
+  };
+
+  const before = capture();
+  const r = runSetup(dir, '7', { BRIDGE_SETUP_TEST_FAIL_VERIFY: '1' });
+  const after = capture();
+
+  const changedFiles = scope.filter((f) => before.state[f] !== after.state[f]);
+  const outboundAbsent = after.state['outbound-clean.js'] === 'absent';
+  const gitSame = before.gs === after.gs;
+
+  results.push({
+    name: '7 新版已写入但校验失败',
+    expect: 'exit≠0 + 文件内容/存在性/git 状态全部还原',
+    exit: r.exit,
+    changedFiles,
+    outboundAbsent,
+    gitSame,
+    scopeCount: scope.length,
+    patchLine: r.patchLine,
+    ok: r.exit !== 0 && changedFiles.length === 0 && outboundAbsent && gitSame,
+  });
+}
+
 console.log('=== 迁移 6 场景（真实 setup.mjs + --skip-napcat）===\n');
 let bad = 0;
 for (const c of results) {
@@ -234,10 +279,12 @@ for (const c of results) {
   if (c.oldIntact !== undefined) console.log(`   旧版安装保留: ${c.oldIntact ? '是' : '否'}`);
   if (c.oldKept !== undefined) console.log(`   旧版标记仍在: ${c.oldKept ? '是' : '否'}`);
   if (c.idxSame !== undefined) console.log(`   index.js 未变: ${c.idxSame ? '是' : '否'} | bridge-features.js 未变: ${c.bfSame ? '是' : '否'}`);
+  if (c.changedFiles !== undefined) console.log(`   快照范围 ${c.scopeCount} 个文件；内容/存在性有变的：${c.changedFiles.length ? c.changedFiles.join(',') : '无'}`);
+  if (c.gitSame !== undefined) console.log(`   git status 未变: ${c.gitSame ? '是' : '否'} | outbound-clean.js 已被删除: ${c.outboundAbsent ? '是' : '否'}`);
   if (c.patchLine) console.log(`   补丁行: ${c.patchLine}`);
   console.log(`   判定: ${c.ok ? 'PASS' : 'FAIL'}`);
   console.log();
   if (!c.ok) bad += 1;
 }
-console.log(bad === 0 ? '=== 6/6 PASS ===' : `=== ${bad} 项 FAIL ===`);
+console.log(bad === 0 ? '=== 7/7 PASS ===' : `=== ${bad} 项 FAIL ===`);
 process.exit(bad === 0 ? 0 : 1);

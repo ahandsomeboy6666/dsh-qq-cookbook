@@ -107,10 +107,35 @@ try {
 
   // 必需步骤：缺失或非 OK 都算失败
   const REQUIRED = ['clone 插件', '应用本地补丁', '注册到 desktop profile'];
+  // 脱敏：抹掉真实用户名路径，诊断输出里不带个人信息
+  const redact = (s) => String(s ?? '')
+    .replace(/[A-Za-z]:\\+Users\\+[^\\\r\n]+/g, '<USER_HOME>')
+    .replace(/[A-Za-z]:\/+Users\/+[^/\r\n]+/g, '<USER_HOME>');
+  let reportedSubprocess = false;
   for (const name of REQUIRED) {
     const st = statusOf(name);
-    if (st === 'OK') pass.push(name + ' OK');
-    else fails.push(name + ' 状态=' + (st || '缺失'));
+    if (st === 'OK') {
+      pass.push(name + ' OK');
+      continue;
+    }
+    fails.push(name + ' 状态=' + (st || '缺失'));
+    if (!st && !reportedSubprocess) {
+      // 第一步就没有输出：只说「缺失」等于什么都没说。
+      // 把子进程实情打出来——退出码 / 是否超时 / 是否根本没起来 / stdout+stderr。
+      reportedSubprocess = true;
+      const timedOut = r.error && /ETIMEDOUT|timed?\s*out/i.test(String(r.error.message));
+      fails.push(
+        '  setup 子进程：退出码=' + (r.status ?? 'null') +
+        ' signal=' + (r.signal ?? '无') +
+        ' 超时=' + (timedOut ? '是' : '否') +
+        ' 启动错误=' + (r.error ? redact(r.error.message).slice(0, 140) : '无'),
+      );
+      console.log('\n=== setup 子进程 stdout（脱敏，最多 6000 字）===');
+      console.log(redact(r.stdout).slice(0, 6000) || '(空)');
+      console.log('=== setup 子进程 stderr（脱敏，最多 3000 字）===');
+      console.log(redact(r.stderr).slice(0, 3000) || '(空)');
+      console.log('=== 子进程输出结束 ===\n');
+    }
   }
 
   // 可选步骤：环境相关，允许失败，但必须出现在白名单里

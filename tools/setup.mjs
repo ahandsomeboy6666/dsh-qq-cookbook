@@ -16,7 +16,7 @@
  *   2. 小号只充 30 元
  */
 import { readFile, writeFile, copyFile, readdir, mkdir, access, open, rm } from 'node:fs/promises'
-import { existsSync, rmSync, readFileSync, statSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs'
+import { existsSync, rmSync, readFileSync, statSync, writeFileSync, readdirSync, mkdtempSync, renameSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { join, dirname, relative } from 'node:path'
@@ -579,15 +579,34 @@ if (!(await exists(VENDOR))) {
     step('clone 插件', 'TODO', `${defaults.pluginRepo} → ${VENDOR}`)
   } else {
     await mkdir(dirname(VENDOR), { recursive: true })
-    // 直连失败就换镜像；每次失败都清掉半成品目录，否则下一次 clone 会报「已存在」。
+    // 直连失败就换镜像。每次都 clone 到带随机后缀的临时目录，
+    // 成功后再改名到 VENDOR：这样失败的半成品不会挡住下一个源
+    // （Windows 上 .git 的 pack 锁文件常常删不掉）。
     let lastError = ''
     let usedMirror = ''
     let ok = false
     for (const candidate of githubCandidates(defaults.pluginRepo)) {
-      const clone = run('git', ['clone', '--quiet', candidate, VENDOR])
-      if (clone.status === 0) { usedMirror = candidate; ok = true; break }
-      lastError = (clone.stderr || clone.error?.message || '').trim().slice(0, 200)
-      rmSync(VENDOR, { recursive: true, force: true })
+      const staging = VENDOR + '.clone-' + Date.now().toString(36)
+      const clone = run('git', ['clone', '--quiet', candidate, staging])
+      if (clone.status === 0) {
+        try {
+          renameSync(staging, VENDOR)
+          usedMirror = candidate
+          ok = true
+          break
+        } catch (error) {
+          lastError = '改名失败：' + String(error?.message ?? error).slice(0, 120)
+        }
+      } else {
+        lastError = (clone.stderr || clone.error?.message || '').trim().slice(0, 200)
+      }
+      // 清掉这次的临时目录；清不掉也继续，反正下次用新名字
+      try {
+        rmSync(staging, { recursive: true, force: true, maxRetries: 6, retryDelay: 250 })
+      } catch {
+        console.log('        临时目录清理失败，已跳过（不影响下一个源）')
+      }
+      if (ok) break
       if (!DRY) console.log(`        直连失败，换下一个源…（${candidate.slice(0, 60)}）`)
     }
     if (!ok) {
@@ -680,17 +699,19 @@ async function patchFiles(patchPath) {
   return [...new Set([...text.matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1]))]
 }
 
-/** 动手前把补丁涉及的每个文件内容存下来（当前 = 旧版状态）；不存在记为 null */
+/** 动手前把补丁涉及的每个文件内容存下来（当前 = 旧版状态）；不存在记为 null。
+ *  用 Buffer 保存原始字节：改文本编码会破坏二进制内容。 */
 async function snapshotFiles(files) {
   const snap = {}
   for (const f of files) {
     const p = join(VENDOR, f)
-    snap[f] = existsSync(p) ? readFileSync(p, 'utf8') : null
+    snap[f] = existsSync(p) ? readFileSync(p) : null
   }
   return snap
 }
 
-/** 按快照写回；返回是否全部成功 */
+/** 按快照写回；返回是否全部成功。
+ *  原本不存在的文件会被删除——否则新版留下的文件会和新旧混装。 */
 function restoreFiles(snap) {
   let ok = true
   for (const [f, content] of Object.entries(snap)) {
@@ -699,7 +720,7 @@ function restoreFiles(snap) {
       if (content === null) {
         if (existsSync(p)) rmSync(p, { force: true })
       } else {
-        writeFileSync(p, content, 'utf8')
+        writeFileSync(p, content)
       }
     } catch {
       ok = false
@@ -808,9 +829,14 @@ if (await exists(indexFile)) {
         summary(); process.exit(1)
       }
 
-      // 快照必须在**撤销旧补丁之前**拍：那时 vendor 还处在旧版状态，
-      // 存下来的才是「旧版文件内容」。拍晚了就只剩上游状态，恢复也回不到旧版。
-      snap = await snapshotFiles(await patchFiles(OLD_PATCH))
+      // 快照必须在**撤销旧补丁之前**拍：那时 vendor 还处在旧版状态。
+      // 范围取「新旧补丁涉及文件的并集」——新版还会改 conversation-care.js、
+      // cordis.patch.yml 并新增 outbound-clean.js。只快照旧补丁的文件，
+      // 万一新版已写入再回滚，这些新改动会留在目录里，变成新旧混装。
+      snap = await snapshotFiles([...new Set([
+        ...(await patchFiles(OLD_PATCH)),
+        ...(await patchFiles(PATCH)),
+      ])])
 
       const reverted = run('git', ['apply', '-R', OLD_PATCH], VENDOR)
       if (reverted.status !== 0) {
@@ -860,6 +886,13 @@ if (await exists(indexFile)) {
       if (upgradedFromOld) console.log('        旧版补丁此前已撤销，本次已按快照写回旧版内容。')
       summary(); process.exit(1)
     }
+    // 测试注入：验证「新版已经写入、随后校验失败」时能否完整退回旧版。
+    // 这条路比「apply 直接失败」更危险：新版文件已经在目录里了。
+    if (process.env.BRIDGE_SETUP_TEST_FAIL_VERIFY === '1') {
+      step('应用本地补丁', 'FAIL', '新版校验失败（测试注入）：模拟 outbound-clean.js 未被引用')
+      console.log('        ' + restoreOld())
+      summary(); process.exit(1)
+    }
     if (!(await hasNewPatch())) {
       step('应用本地补丁', 'FAIL', 'apply 成功但新版标记缺失（outbound-clean.js 未生成或未被引用）')
       console.log('        ' + restoreOld())
@@ -871,6 +904,7 @@ if (await exists(indexFile)) {
     const dirtyAfter = run('git', ['status', '--porcelain'], VENDOR)
     if (dirtyAfter.status === 0 && dirtyAfter.stdout.trim() === '') {
       step('应用本地补丁', 'FAIL', 'apply 后工作区无改动（补丁未生效）')
+      console.log('        ' + restoreOld())
       summary(); process.exit(1)
     }
     // 数量从补丁本身数，别写死——补丁一直在长（现在 22 处）。
