@@ -17,20 +17,23 @@
 
 ## 二、离线回放（不碰真 QQ）
 
+回放用**独立端口 + 临时数据目录 + 假账号**，不需要停真 NapCat，也不读写真实会话。
+
 ```powershell
-# 1) 停真 NapCat（6701 要让给假服务）
-#    tools\一键启动肥鱼.bat 选 [2]，或结束 NapCatWinBootMain 进程树
+# 合并链路回归（16801 号测试接口，假 QQ 只收一条固定回复）
+node checks\replay\merge-offline.mjs
 
-# 2) 跑回放
-node checks\replay\run.mjs --out checks\replay\out-after.json --label after
+# 插件可加载（默认验证仓库里的 vendor；可加 --plugin <目录> 指向重建出来的那份）
+node checks\replay\load-check.mjs
 
-# 3) 跑完恢复
-tools\一键启动肥鱼.bat
+# 补丁迁移的五个场景（自带临时目录，不受 NapCat 下载影响）
+node checks\replay\patch-upgrade.mjs
 ```
 
-- `checks/replay/fake-napcat.mjs`：手写最小 WebSocket 服务端，只监听 `127.0.0.1:6701`，桥接发出的所有消息落在内存 `state.sent`，**不会到达 QQ**。
-- `checks/replay/run.mjs`：9 个 case，对应验收表；同时数 `bridge.log` 里 `admitted prompt` 得到模型回合数。
-- 判定口径：气泡按**每模型回合**算（两轮各 1 条合格，一轮 4 条才超标）。
+- `checks/replay/fake-napcat.mjs`：手写最小 WebSocket 服务端，监听测试端口（16701–16705），桥接发出的所有消息落在内存 `state.sent`，**不会到达 QQ**。
+- `checks/replay/merge-offline.mjs`：在独立进程里 apply 插件，注入两条消息，断言「只提交一次、正文含两条且顺序正确、假 QQ 恰好收到一条固定回复」。
+- `checks/replay/patch-upgrade.mjs`：干净安装 / 旧版升级 / 重跑幂等 / 有改动拒绝 / 补丁损坏回滚，断言真实退出码与文件状态。
+- 本机另有写真实数据目录的旧回放脚本（`run.mjs` 等），**没有纳入发布**，只在本地用于端到端体验验收。
 
 ## 三、改前 / 改后结果
 
