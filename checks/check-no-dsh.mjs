@@ -2,13 +2,27 @@
 /**
  * 陌生人无 DSH 场景：setup 必须给出明确指引（不是崩溃），并阻断后续步骤。
  */
-import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync, readdirSync, statSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 if (process.platform !== 'win32') {
   console.log('[SKIP] 非 Windows，跳过');
   process.exit(2);
+}
+
+/**
+ * 递归复制目录。不用 fs.cpSync：在 Windows + node 22 上，往 %TEMP% 下复制目录
+ * 会稳定报 `EIO, Access is denied`（手动逐文件复制则正常）。这是 cpSync 的实现问题，
+ * 不是权限问题。
+ */
+function copyDir(src, dst) {
+  if (statSync(src).isDirectory()) {
+    mkdirSync(dst, { recursive: true });
+    for (const name of readdirSync(src)) copyDir(join(src, name), join(dst, name));
+  } else {
+    copyFileSync(src, dst);
+  }
 }
 
 const ROOT = dirname(import.meta.dirname);
@@ -21,12 +35,12 @@ const pass = [];
 try {
   const emptyDsh = join(tmp, 'empty-dsh');
   mkdirSync(emptyDsh, { recursive: true });
-  cpSync(join(ROOT, 'config'), join(tmp, 'config'), { recursive: true });
+  copyDir(join(ROOT, 'config'), join(tmp, 'config'));
   mkdirSync(join(tmp, 'tools'), { recursive: true });
-  cpSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
+  copyFileSync(join(ROOT, 'tools', 'setup.mjs'), join(tmp, 'tools', 'setup.mjs'));
   // 完全独立：复制 package.json/lock 并安装依赖
   for (const name of ['package.json', 'package-lock.json']) {
-    if (existsSync(join(ROOT, name))) cpSync(join(ROOT, name), join(tmp, name));
+    if (existsSync(join(ROOT, name))) copyFileSync(join(ROOT, name), join(tmp, name));
   }
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const install = spawnSync(npm, ['install', '--no-audit', '--no-fund'], {
