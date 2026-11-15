@@ -1,4 +1,4 @@
-﻿# 一键启动肥鱼：NapCat + DSH + TTS（火山引擎豆包语音）+ 桥接自检
+# 一键启动肥鱼：NapCat + DSH + TTS（火山引擎豆包语音）+ 桥接自检
 $ErrorActionPreference = 'Continue'
 $tools = $PSScriptRoot
 $root = Split-Path -Parent $tools
@@ -16,7 +16,7 @@ $dshExe = $dshCandidates | Where-Object { Test-Path $_ } | Select-Object -First 
 $ttsDir = 'E:\workspace\audio.cpp'
 $ttsServer = Join-Path $ttsDir 'audiocpp_server.exe'
 $ttsConfig = Join-Path $ttsDir 'server-all.json'
-$gateway = Join-Path $ttsDir 'gateway-volc.mjs'
+$gateway = Join-Path $ttsDir 'gateway.mjs'   # 必须和下方实际启动的文件一致（原来写的是 gateway-volc.mjs）
 
 function Test-Port([int]$port) {
   $client = New-Object System.Net.Sockets.TcpClient
@@ -102,8 +102,9 @@ if (-not (Test-Port 8080)) {
 # 语音参数（IndexTTS 2）：duration_scale=1.1 / volume=1.0 / bass=+5@200Hz
 # 这些参数写在 gateway.mjs 里（FILTER + options.duration_scale），启动时不需要额外设置。
 # 若听感变回「响/快/薄」，检查 gateway.mjs 的这三个值是否被改回默认。
+# 8090 已在监听就整段跳过——重复执行不会重复起服务。
 if ($ttsServerOk -and -not (Test-Port 8090)) {
-  if (Test-Path $gateway) { Start-Process -FilePath 'node' -ArgumentList @('gateway.mjs') -WorkingDirectory $ttsDir -WindowStyle Hidden; Start-Sleep -Seconds 2 }
+  if (Test-Path $gateway) { Start-Process -FilePath 'node' -ArgumentList @((Split-Path $gateway -Leaf)) -WorkingDirectory $ttsDir -WindowStyle Hidden; Start-Sleep -Seconds 2 }
 }
 if ((Test-Port 8080) -and (Test-Port 8090)) {
   Write-Host '  ok 8080 + 8090' -ForegroundColor Green
