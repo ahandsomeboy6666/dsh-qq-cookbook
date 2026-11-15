@@ -43,6 +43,7 @@ const SCRIPTS = {
   cmdSafety: 'checks/check-cmd-safety.mjs',
   secBehavior: 'checks/security-behavior.mjs',
   outboundPaths: 'checks/check-outbound-paths.mjs',
+  promptLeak: 'checks/check-prompt-leak.mjs',
   cleanInstall: 'checks/check-clean-install.mjs',
   noDsh: 'checks/check-no-dsh.mjs',
   deployState: 'checks/check-deploy-state.mjs',
@@ -54,13 +55,15 @@ const SCRIPTS = {
   install: 'checks/check-install.mjs',
   persona: 'checks/check-persona.mjs',
   budget: 'checks/check-budget.mjs',
-  browser: 'checks/check-browser.mjs'
+  browser: 'checks/check-browser.mjs',
+  leakCases: 'checks/replay/leak-cases.mjs',
+  bridgeLoad: 'checks/replay/load-check.mjs'
 }
 
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'cleanInstall', 'noDsh', 'deployState', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'promptLeak', 'leakCases', 'bridgeLoad', 'cleanInstall', 'noDsh', 'deployState', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {
@@ -92,6 +95,7 @@ const LABELS = {
   cmdSafety: '命令构造安全',
   secBehavior: '安全行为（静态）',
   outboundPaths: '出站路径覆盖',
+  promptLeak: '注入块不泄漏',
   cleanInstall: '从零安装（隔离）',
   noDsh: '无 DSH 指引',
   deployState: '部署状态',
