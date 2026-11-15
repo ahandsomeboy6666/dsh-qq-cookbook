@@ -3,7 +3,7 @@
  * T3 出站审计：cheems 发送前必须扫描路径/凭据特征，命中即拦截。
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 const ROOT = import.meta.dirname.replace(/[\\/]checks$/, '');
 const INDEX = join(ROOT, 'vendor/dsh-im-bridge/index.js');
@@ -12,9 +12,13 @@ if (!existsSync(INDEX)) {
   process.exit(2);
 }
 const src = readFileSync(INDEX, 'utf8');
+// scanOutgoing 与它的规则表已迁到 outbound-clean.js；只读 index.js 会误判「未实现/未覆盖」。
+const CLEAN_MODULE = join(dirname(INDEX), 'outbound-clean.js');
+const fullSrc = src + '\n' + (existsSync(CLEAN_MODULE) ? readFileSync(CLEAN_MODULE, 'utf8') : '');
+
 const fails = [];
 
-if (!/function scanOutgoing\s*\(/.test(src)) fails.push('缺少 scanOutgoing 函数（出站审计未实现）');
+if (!/function scanOutgoing\s*\(/.test(fullSrc)) fails.push('缺少 scanOutgoing 函数（出站审计未实现）');
 
 const flushIdx = src.indexOf('async function flushOutbox');
 const sendIdx = src.indexOf("request('send_msg'", flushIdx);
@@ -25,7 +29,7 @@ if (flushIdx >= 0 && sendIdx >= 0 && (scanCallIdx < 0 || scanCallIdx > sendIdx))
   fails.push('flushOutbox 在 send_msg 前没有调用 scanOutgoing');
 }
 
-const has = (needle) => src.includes(needle);
+const has = (needle) => fullSrc.includes(needle);
 if (!has('本机路径') || !has('[A-Za-z]:')) fails.push('scanOutgoing 未覆盖规则：本机路径');
 if (!has('凭据') || !has('api[_-]?key')) fails.push('scanOutgoing 未覆盖规则：凭据词');
 if (!has('私钥') || !has('PRIVATE KEY')) fails.push('scanOutgoing 未覆盖规则：私钥');

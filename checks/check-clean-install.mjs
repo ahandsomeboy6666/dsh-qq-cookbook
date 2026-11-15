@@ -107,6 +107,17 @@ try {
 
   // 必需步骤：缺失或非 OK 都算失败
   const REQUIRED = ['clone 插件', '应用本地补丁', '注册到 desktop profile'];
+
+  // 网络不可达时明确 SKIP 而不是 FAIL：从零安装必须 clone 上游，
+  // 拿不到代码时后面所有「缺文件/缺提示/HEAD 不符」都是连带结果，不是代码缺陷。
+  // 只在网络类错误上触发，其他失败仍然照常报红。
+  const networkBlocked = /ETIMEDOUT|Could not resolve host|Failed to connect|Connection (timed out|refused)|network is unreachable/i.test(out)
+    && statusOf('clone 插件') !== 'OK';
+  if (networkBlocked) {
+    console.log('\n[SKIP] 无法访问 GitHub 或镜像（clone 超时/不可达），从零安装需要网络，跳过。');
+    console.log('       这不是代码问题：其余检查照常执行。网络恢复后重跑即可。');
+    process.exit(2);
+  }
   // 脱敏：抹掉真实用户名路径，诊断输出里不带个人信息
   const redact = (s) => String(s ?? '')
     .replace(/[A-Za-z]:\\+Users\\+[^\\\r\n]+/g, '<USER_HOME>')

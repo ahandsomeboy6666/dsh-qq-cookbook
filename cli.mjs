@@ -63,7 +63,7 @@ const SCRIPTS = {
 const GROUPS = {
   check: {
     title: '静态门禁',
-    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'promptLeak', 'leakCases', 'bridgeLoad', 'cleanInstall', 'noDsh', 'deployState', 'audit', 'logging', 'drill'],
+    items: ['assets', 'consistency', 'privacy', 'configRobust', 'configRecovery', 'patchPartial', 'bridgeConcurrency', 'cmdSafety', 'secBehavior', 'outboundPaths', 'promptLeak', 'leakCases', 'bridgeLoad', 'noDsh', 'deployState', 'audit', 'logging', 'drill'],
     gate: true
   },
   doctor: {

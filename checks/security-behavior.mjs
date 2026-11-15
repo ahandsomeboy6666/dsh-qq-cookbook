@@ -44,7 +44,10 @@ if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor 不存在（CI），跳过安全行为测试');
   process.exit(2);
 }
-const src = readFileSync(INDEX, 'utf8');
+// 出站清洗/审计函数已迁到 outbound-clean.js（新补丁引入的独立模块）。
+// 只读 index.js 会误报「出站审计函数存在 = 失败」，所以两个文件一起读。
+const CLEAN_MODULE = join(dirname(INDEX), 'outbound-clean.js');
+const src = readFileSync(INDEX, 'utf8') + '\n' + (existsSync(CLEAN_MODULE) ? readFileSync(CLEAN_MODULE, 'utf8') : '');
 const s = (name, ok, detail = '') => (ok ? staticPass : staticFail).push(name + (detail ? `（${detail}）` : ''));
 
 s('出站审计函数存在', /function scanOutgoing\s*\(/.test(src));

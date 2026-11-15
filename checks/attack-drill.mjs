@@ -4,7 +4,7 @@
  * 端到端演练需要 DSH 运行，这里只验证「防护机制存在且接线」。
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 const ROOT = import.meta.dirname.replace(/[\\/]checks$/, '');
 const INDEX = join(ROOT, 'vendor/dsh-im-bridge/index.js');
@@ -12,7 +12,9 @@ if (!existsSync(INDEX)) {
   console.log('[SKIP] vendor/dsh-im-bridge 未 clone（CI 环境），跳过攻击演练');
   process.exit(2);
 }
-const src = readFileSync(INDEX, 'utf8');
+// T3 的 scanOutgoing 在 outbound-clean.js 里，两个文件一起读。
+const CLEAN_MODULE = join(dirname(INDEX), 'outbound-clean.js');
+const src = readFileSync(INDEX, 'utf8') + '\\n' + (existsSync(CLEAN_MODULE) ? readFileSync(CLEAN_MODULE, 'utf8') : '');
 const fails = [];
 
 const checks = [
