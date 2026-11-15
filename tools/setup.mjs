@@ -674,12 +674,45 @@ function sameStat(a, b) {
   return true
 }
 
+/** 解析补丁涉及的文件列表（b/xxx） */
+async function patchFiles(patchPath) {
+  const text = await readFile(patchPath, 'utf8')
+  return [...new Set([...text.matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1]))]
+}
+
+/** 动手前把补丁涉及的每个文件内容存下来（当前 = 旧版状态）；不存在记为 null */
+async function snapshotFiles(files) {
+  const snap = {}
+  for (const f of files) {
+    const p = join(VENDOR, f)
+    snap[f] = existsSync(p) ? readFileSync(p, 'utf8') : null
+  }
+  return snap
+}
+
+/** 按快照写回；返回是否全部成功 */
+function restoreFiles(snap) {
+  let ok = true
+  for (const [f, content] of Object.entries(snap)) {
+    const p = join(VENDOR, f)
+    try {
+      if (content === null) {
+        if (existsSync(p)) rmSync(p, { force: true })
+      } else {
+        writeFileSync(p, content, 'utf8')
+      }
+    } catch {
+      ok = false
+    }
+  }
+  return ok
+}
+
 /**
  * 迁移演练：在临时 git worktree 里跑完整的「撤旧 → 装新 → 语法检查」。
  * 全程不碰正式 vendor，所以任何一步失败都不会影响现有安装。
  */
-async function rehearseMigration() {
-  const tmp = mkdtempSync(join(tmpdir(), 'bridge-migrate-'))
+async function rehearseMigration() {  const tmp = mkdtempSync(join(tmpdir(), 'bridge-migrate-'))
   const cleanup = () => {
     try { run('git', ['worktree', 'remove', '--force', tmp], VENDOR) } catch { /* ignore */ }
     try { rmSync(tmp, { recursive: true, force: true }) } catch { /* ignore */ }
@@ -711,6 +744,7 @@ async function rehearseMigration() {
   }
 }
 
+let snap = null
 if (await exists(indexFile)) {
   const code = await readFile(indexFile, 'utf8')
   if (await hasNewPatch()) {
@@ -774,6 +808,10 @@ if (await exists(indexFile)) {
         summary(); process.exit(1)
       }
 
+      // 快照必须在**撤销旧补丁之前**拍：那时 vendor 还处在旧版状态，
+      // 存下来的才是「旧版文件内容」。拍晚了就只剩上游状态，恢复也回不到旧版。
+      snap = await snapshotFiles(await patchFiles(OLD_PATCH))
+
       const reverted = run('git', ['apply', '-R', OLD_PATCH], VENDOR)
       if (reverted.status !== 0) {
         step('应用本地补丁', 'FAIL', '撤销旧补丁失败（演练已通过，属意外）：' + String(reverted.stderr ?? '').slice(0, 160))
@@ -800,13 +838,31 @@ if (await exists(indexFile)) {
       console.log('        补丁与上游版本不兼容：更新 patches/ 或回退 pluginBaseline')
       summary(); process.exit(1)
     }
+    // 正式动手前存快照：补丁涉及的每个文件的当前内容（= 旧版状态）。
+    // 演练只能证明「补丁能装到上游」，装不到正式目录的原因（磁盘、权限、并发改动）
+    // 只能在真正 apply 时才知道，所以正式路径必须自带恢复能力。
+    const restoreOld = () => {
+      if (!snap) return '（本次不是升级，无需恢复旧版）'
+      return restoreFiles(snap) ? '已按快照恢复旧版文件' : '快照恢复失败，请从备份恢复 vendor'
+    }
+
+    // 测试注入：只用于验证「正式应用失败 → 按快照恢复旧版」这条路径。
+    // 仅在显式设置环境变量时生效，正常安装不会走到这里。
+    if (process.env.BRIDGE_SETUP_TEST_FAIL_APPLY === '1') {
+      step('应用本地补丁', 'FAIL', '正式应用新补丁失败（测试注入）：模拟 git apply 报错')
+      console.log('        ' + restoreOld())
+      summary(); process.exit(1)
+    }
     const applied = run('git', ['apply', PATCH], VENDOR)
     if (applied.status !== 0) {
-      step('应用本地补丁', 'FAIL', 'git apply 执行失败：' + String(applied.stderr ?? '').slice(0, 160))
+      step('应用本地补丁', 'FAIL', '正式应用新补丁失败：' + String(applied.stderr ?? '').slice(0, 160))
+      console.log('        ' + restoreOld())
+      if (upgradedFromOld) console.log('        旧版补丁此前已撤销，本次已按快照写回旧版内容。')
       summary(); process.exit(1)
     }
     if (!(await hasNewPatch())) {
       step('应用本地补丁', 'FAIL', 'apply 成功但新版标记缺失（outbound-clean.js 未生成或未被引用）')
+      console.log('        ' + restoreOld())
       summary(); process.exit(1)
     }
     if (upgradedFromOld) {

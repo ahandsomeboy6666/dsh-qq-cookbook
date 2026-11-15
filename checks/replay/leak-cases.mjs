@@ -4,7 +4,14 @@
 // 用法：node checks/replay/leak-cases.mjs
 // 干净仓库（还没 clone 插件）没有这个模块：动态 import + exit 2（SKIP），
 // 让默认门禁在新机器上不会因为「插件还没装」而变红。
-const MOD = await import('../../vendor/dsh-im-bridge/outbound-clean.js').catch(() => null);
+const MOD = await import('../../vendor/dsh-im-bridge/outbound-clean.js').catch((error) => {
+  // 只有「文件不存在」才算 SKIP；模块内部语法错误必须暴露，
+  // 否则插件真坏了也会被记成「干净仓库跳过」。
+  const msg = String(error?.message || '');
+  if (/ERR_MODULE_NOT_FOUND|Cannot find module|Failed to load url/i.test(msg)) return null;
+  console.error('[FAIL] 加载 outbound-clean.js 出错（不是缺文件）：' + msg.slice(0, 300));
+  process.exit(1);
+});
 if (!MOD) {
   console.log('[SKIP] vendor/dsh-im-bridge/outbound-clean.js 不存在：先 clone 插件（或按补丁重建）再跑本检查');
   process.exit(2);

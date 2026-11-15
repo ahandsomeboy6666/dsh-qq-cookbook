@@ -61,14 +61,14 @@ function makeRepo(tag) {
 const SKIP = '--skip-napcat';
 
 /** 跑安装器，返回真实退出码 */
-function runSetup(dir, tag) {
+function runSetup(dir, tag, extraEnv = {}) {
   const home = path.join(os.tmpdir(), 'mighome-' + tag + '-' + Date.now().toString(36));
   fs.mkdirSync(path.join(home, 'profiles', 'desktop'), { recursive: true });
   fs.writeFileSync(path.join(home, 'profiles', 'desktop', 'package.json'),
     JSON.stringify({ name: 'desktop', private: true }, null, 2));
   const r = spawnSync(NODE, ['tools/setup.mjs', '--qq', '000000000', '--group', '111111111', SKIP], {
     cwd: dir, encoding: 'utf8', timeout: 240000,
-    env: { ...process.env, DSH_HOME: home },
+    env: { ...process.env, DSH_HOME: home, ...extraEnv },
   });
   const out = (r.stdout || '') + (r.stderr || '');
   return {
@@ -192,7 +192,34 @@ const results = [];
   });
 }
 
-console.log('=== 迁移 5 场景（真实 setup.mjs + --skip-napcat）===\n');
+// ── 6 演练通过但正式应用失败 → 旧版内容必须还在 ──
+{
+  const { dir, vend } = makeRepo('6');
+  sh('git', ['apply', OLD_PATCH], vend);
+  const idxBefore = fs.readFileSync(path.join(vend, 'index.js'), 'utf8');
+  const bfBefore = fs.readFileSync(path.join(vend, 'bridge-features.js'), 'utf8');
+
+  // 用 setup.mjs 的测试注入钩子精确模拟「演练通过、正式应用失败」。
+  // 文件系统层伪造（attrib/只读/ACL）要么拦不住 git apply，要么连带破坏 git 状态，
+  // 会让流程在更早的检查就退出，测不到真正要测的分支。
+  const r = runSetup(dir, '6', { BRIDGE_SETUP_TEST_FAIL_APPLY: '1' });
+
+  const idxAfter = fs.readFileSync(path.join(vend, 'index.js'), 'utf8');
+  const bfAfter = fs.readFileSync(path.join(vend, 'bridge-features.js'), 'utf8');
+  const oldKept = idxAfter.includes('normalizeGroupWake') && !fs.existsSync(path.join(vend, 'outbound-clean.js'));
+  results.push({
+    name: '6 演练通过但正式应用失败',
+    expect: 'exit≠0 + 旧版文件仍在',
+    exit: r.exit,
+    oldKept,
+    idxSame: idxBefore === idxAfter,
+    bfSame: bfBefore === bfAfter,
+    patchLine: r.patchLine,
+    ok: r.exit !== 0 && oldKept,
+  });
+}
+
+console.log('=== 迁移 6 场景（真实 setup.mjs + --skip-napcat）===\n');
 let bad = 0;
 for (const c of results) {
   console.log(`── ${c.name}`);
@@ -205,10 +232,12 @@ for (const c of results) {
   if (c.trackedKept !== undefined) console.log(`   已跟踪改动保留: ${c.trackedKept ? '是' : '否'}`);
   if (c.untrackedKept !== undefined) console.log(`   未跟踪备份保留: ${c.untrackedKept ? '是' : '否'}`);
   if (c.oldIntact !== undefined) console.log(`   旧版安装保留: ${c.oldIntact ? '是' : '否'}`);
+  if (c.oldKept !== undefined) console.log(`   旧版标记仍在: ${c.oldKept ? '是' : '否'}`);
+  if (c.idxSame !== undefined) console.log(`   index.js 未变: ${c.idxSame ? '是' : '否'} | bridge-features.js 未变: ${c.bfSame ? '是' : '否'}`);
   if (c.patchLine) console.log(`   补丁行: ${c.patchLine}`);
   console.log(`   判定: ${c.ok ? 'PASS' : 'FAIL'}`);
   console.log();
   if (!c.ok) bad += 1;
 }
-console.log(bad === 0 ? '=== 5/5 PASS ===' : `=== ${bad} 项 FAIL ===`);
+console.log(bad === 0 ? '=== 6/6 PASS ===' : `=== ${bad} 项 FAIL ===`);
 process.exit(bad === 0 ? 0 : 1);
