@@ -101,7 +101,9 @@ const LABELS = {
   deployState: '部署状态',
   audit: '出站审计',
   logging: '日志无密钥',
-  drill: '攻击演练（静态）'
+  drill: '攻击演练（静态）',
+  leakCases: '出站清洗规则',
+  bridgeLoad: '桥接可加载'
 }
 
 function run(item) {

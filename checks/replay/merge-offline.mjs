@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { createFakeNapCat } from './fake-napcat.mjs';
 
@@ -23,7 +23,14 @@ const USER = '900000001';           // 假账号
 const FIXED_REPLY = '离线测试固定回复';
 // 默认验证实际安装的插件；--plugin <dir> 可指向干净目录重建出来的那份。
 const pluginArg = (() => { const i = process.argv.indexOf('--plugin'); return i >= 0 ? process.argv[i + 1] : null; })();
-const VENDOR = pluginArg ? path.resolve(pluginArg) : path.join(os.homedir(), '.dsh', 'profiles', 'desktop', 'node_modules', 'dsh-im-bridge');
+// 默认顺序：--plugin > 仓库内 vendor > 本机 DSH profile。
+// 干净环境（CI/新机器）没有本机 profile，只要仓库里 vendor 在就能跑。
+const REPO_VENDOR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'vendor', 'dsh-im-bridge');
+const VENDOR = pluginArg
+  ? path.resolve(pluginArg)
+  : (fs.existsSync(path.join(REPO_VENDOR, 'index.js'))
+      ? REPO_VENDOR
+      : path.join(os.homedir(), '.dsh', 'profiles', 'desktop', 'node_modules', 'dsh-im-bridge'));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
